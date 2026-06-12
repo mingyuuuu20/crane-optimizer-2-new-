@@ -158,8 +158,7 @@ _meta = ACTIVE_SITE.metadata
 st.markdown(
     f"**현재 부지**: {_meta.get('display_name', 'Site')}  "
     f"({SITE_AREA_OFFICIAL_M2:.1f}㎡, {_meta.get('zoning', '용도지역 미상')})  |  "
-    f"**알고리즘**: NSGA-II 다목적 최적화  |  "
-    f"**캡스톤 디자인** · 건축공학과"
+    f"**알고리즘**: NSGA-II 다목적 최적화"
 )
 
 st.divider()
@@ -868,11 +867,11 @@ with tab6:
                               "xmax": [-21.0], "ymax": [15.0], "width_m": [6.0]}),
                 num_rows="dynamic", key="nb_roaddf", width="stretch")
             st.markdown("**자재 야적장** (적재 경로 출발점 — 운영가중 F1에 사용)")
-        _yc1, _yc2 = st.columns(2)
-        yard_x = _yc1.number_input("야적장 x (m, 동+)", -200.0, 200.0, -23.0,
-                                   0.5, key="nb_yx")
-        yard_y = _yc2.number_input("야적장 y (m, 북+)", -200.0, 200.0, 0.0,
-                                   0.5, key="nb_yy")
+            _yc1, _yc2 = st.columns(2)
+            yard_x = _yc1.number_input("야적장 x (m, 동+)", -200.0, 200.0, -23.0,
+                                       0.5, key="nb_yx")
+            yard_y = _yc2.number_input("야적장 y (m, 북+)", -200.0, 200.0, 0.0,
+                                       0.5, key="nb_yy")
 
         # ----- 미리보기 + 저장 -----
         with cR:
@@ -1012,6 +1011,5 @@ st.divider()
 st.caption(
     "출처: KOSHA GUIDE C-104·C-50 / KDS 41 12 00 / 산안기준규칙 / "
     "ISO 31000 / 손승현 외 (2022) 한국건축시공학회지 / "
-    "Manitowoc·Liebherr 공식 데이터시트  |  "
-    "캡스톤 디자인 — 건축공학과"
+    "Manitowoc·Liebherr 공식 데이터시트"
 )
