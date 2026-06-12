@@ -1,0 +1,9 @@
+shapely>=2.0
+numpy>=1.24
+pandas>=2.0
+matplotlib>=3.7
+pymoo>=0.6.1
+streamlit>=1.46
+weasyprint>=60
+folium>=0.17
+streamlit-folium>=0.22
