@@ -88,6 +88,23 @@ var initLat = parseFloat(params.get('lat') || '35.18');
 var initLng = parseFloat(params.get('lng') || '128.1076');
 var initZoom = parseInt(params.get('zoom') || '17');
 var vworldKey = params.get('key') || '';
+var lotParam = params.get('lot') || '';
+
+// 대지 경계 오버레이 (이전 단계에서 넘어온 경우)
+function showPrevLot(map) {
+  if (!lotParam) return;
+  try {
+    var pts = JSON.parse(decodeURIComponent(lotParam));
+    if (pts && pts.length >= 3) {
+      var poly = L.polygon(pts, {
+        color: '#f2b705', weight: 2.5, fill: true,
+        fillColor: '#f2b705', fillOpacity: 0.08,
+        dashArray: '6,4'
+      }).addTo(map);
+      poly.bindTooltip('대지 경계', { permanent: true, direction: 'center', className: 'lot-label' });
+    }
+  } catch(e) {}
+}
 
 var map = L.map('map', { center: [initLat, initLng], zoom: initZoom });
 
@@ -120,6 +137,7 @@ if (vworldKey) {
 
 L.control.layers(baseLayers, overlays, { position: 'topright' }).addTo(map);
 L.control.scale({ imperial: true }).addTo(map);
+showPrevLot(map);
 
 var drawnItems = new L.FeatureGroup();
 map.addLayer(drawnItems);
