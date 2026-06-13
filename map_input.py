@@ -402,31 +402,25 @@ def render_map_wizard():
         _saved_ret = ss.get(f"mw_drawn_{step}", ret)
         polys, markers = _read_drawings(_saved_ret)
     else:
-        # 1~4단계: folium Draw — 도형은 매번 ret에서 읽고 session_state에 누적 저장
+        # 1~4단계: returned_objects=[] → 그리는 도중 rerun 없음 → 클릭 가능
+        # 완료 버튼 누를 때 session_state[key]에서 도형 읽기
         from streamlit_folium import st_folium
+        _map_key = f"mw_map_{step}"
         fmap = _make_map(ss["mw_center"], ss["mw_zoom"], "polygon", state)
-        ret = st_folium(fmap, key=f"mw_map_{step}", height=480,
-                        use_container_width=True,
-                        returned_objects=["all_drawings", "center", "zoom"])
-        # 지도 이동/줌 저장
-        if ret:
-            if ret.get("center"):
-                ss["mw_center"] = [ret["center"]["lat"], ret["center"]["lng"]]
-            if ret.get("zoom"):
-                ss["mw_zoom"] = ret["zoom"]
-            # 새 도형이 ret에 있으면 즉시 session_state에 저장 (rerun 대비)
-            if ret.get("all_drawings"):
-                ss[f"mw_drawn_{step}"] = ret
-        # 완료 버튼 — 명시적으로 다시 한 번 저장
-        _btn_col1, _btn_col2 = st.columns([1, 3])
-        if _btn_col1.button("✅ 그리기 완료", key=f"mw_done_{step}",
-                             type="primary", width="stretch"):
-            if ret and ret.get("all_drawings"):
-                ss[f"mw_drawn_{step}"] = ret
+        st_folium(fmap, key=_map_key, height=480,
+                  use_container_width=True,
+                  returned_objects=[])  # 빈 리스트 = rerun 없음
+
+        # 완료 버튼 누를 때만 session_state[key]에서 도형 읽어서 저장
+        if st.button("✅ 그리기 완료 — 도형 저장", key=f"mw_done_{step}",
+                     type="primary"):
+            _latest = st.session_state.get(_map_key, {})
+            if _latest.get("all_drawings"):
+                ss[f"mw_drawn_{step}"] = _latest
             st.rerun()
-        _btn_col2.caption("그린 뒤 이 버튼을 누르세요 (도형 보존됨)")
-        # 저장된 도형 읽기
-        _saved_ret = ss.get(f"mw_drawn_{step}", ret)
+
+        # 이전에 저장된 도형 사용
+        _saved_ret = ss.get(f"mw_drawn_{step}", {})
         polys, markers = _read_drawings(_saved_ret)
 
     # ---- 단계별 부가 입력 ----
