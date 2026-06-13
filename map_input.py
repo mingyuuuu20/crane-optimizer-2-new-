@@ -26,132 +26,21 @@ import json as _json_mi
 
 def _render_map_component(center, zoom, vworld_key="", step=1):
     """
-    HTML 컴포넌트 — 완료 버튼 누르면 숨겨진 text_area에 GeoJSON 저장 → rerun.
-    그리는 도중 rerun 없음.
-    반환: {"geojson": ..., "map_center": [...], "map_zoom": ...} 또는 None
+    declare_component(path=) 방식 — Streamlit 내부 메시지 프로토콜 직접 구현.
+    완료 버튼 클릭 시에만 Python으로 값 반환. 그리는 도중 rerun 없음.
     """
-    import streamlit as _st2
     import streamlit.components.v1 as _cv1
-    import json as _json2
+    _comp_dir = _os.path.join(_os.path.dirname(__file__), "map_component")
+    _map_draw = _cv1.declare_component("map_draw", path=_comp_dir)
+    result = _map_draw(
+        center=list(center),
+        zoom=int(zoom),
+        vworld_key=str(vworld_key),
+        default=None,
+        key=f"map_draw_{step}",
+    )
+    return result
 
-    _sess_key = f"mw_comp_result_{step}"
-
-    # HTML 파일 읽기
-    _html_path = _os.path.join(_os.path.dirname(__file__), "map_component", "index.html")
-    if _os.path.exists(_html_path):
-        html_content = open(_html_path, encoding="utf-8").read()
-    else:
-        _st2.error("map_component/index.html 파일이 없습니다.")
-        return None
-
-    # 초기 파라미터 + 결과 전달용 숨김 input ID 주입
-    _uid = f"mc_result_{step}"
-    init_script = f"""
-<script>
-window.addEventListener("load", function() {{
-  setTimeout(function() {{
-    if (typeof Streamlit !== "undefined") {{
-      Streamlit.setComponentReady();
-      Streamlit.setFrameHeight(540);
-    }}
-    if (typeof initMap === "function") {{
-      initMap({{
-        center: {list(center)},
-        zoom: {int(zoom)},
-        vworld_key: "{vworld_key}"
-      }});
-    }}
-  }}, 400);
-}});
-
-// 완료 버튼 클릭 시 부모 창으로 결과 전달
-function sendToStreamlit(data) {{
-  window.parent.postMessage({{
-    type: "MAPRESULT_{step}",
-    payload: JSON.stringify(data)
-  }}, "*");
-}}
-</script>
-<script>
-// 부모(Streamlit)에서 메시지 수신해서 hidden input에 저장
-window.parent.addEventListener("message", function() {{}}, false);
-</script>
-"""
-    html_content = html_content.replace("</body>", init_script + "</body>")
-
-    # 결과 수신용 숨김 text_area (height=0으로 숨김)
-    _result_key = f"_mc_hidden_{step}"
-    _stored = _st2.session_state.get(_sess_key)
-
-    # JS→Python 브릿지: postMessage를 Streamlit text_area로 전달하는 중간 HTML
-    bridge_html = f"""
-<script>
-window.addEventListener("message", function(e) {{
-  if (e.data && e.data.type === "MAPRESULT_{step}") {{
-    var ta = window.parent.document.querySelector('textarea[data-testid="stTextArea"][aria-label="{_result_key}"]');
-    if (!ta) {{
-      var inputs = window.parent.document.querySelectorAll('textarea');
-      for (var i=0; i<inputs.length; i++) {{
-        if (inputs[i].placeholder === "{_result_key}") {{ ta = inputs[i]; break; }}
-      }}
-    }}
-    if (ta) {{
-      var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.parent.HTMLTextAreaElement.prototype, 'value').set;
-      nativeInputValueSetter.call(ta, e.data.payload);
-      ta.dispatchEvent(new Event('input', {{ bubbles: true }}));
-    }}
-  }}
-}});
-</script>
-"""
-
-    _cv1.html(html_content, height=545, scrolling=False)
-    _cv1.html(bridge_html, height=0)
-
-    # 숨겨진 text_area로 결과 받기
-    import streamlit as st2
-    _raw = st2.text_area(_result_key, value="", key=_result_key,
-                         label_visibility="collapsed", height=1)
-    if _raw and _raw.strip():
-        try:
-            _data = _json2.loads(_raw)
-            st2.session_state[_sess_key] = _data
-            return _data
-        except Exception:
-            pass
-    return _st2.session_state.get(_sess_key)
-
-
-_DEFAULT_ZOOM = 16
-
-_ESRI_URL = ("https://server.arcgisonline.com/ArcGIS/rest/services/"
-             "World_Imagery/MapServer/tile/{z}/{y}/{x}")
-
-STEPS = ["위치 찾기", "① 대지", "② 신축 건물", "③ 인접 건물",
-         "④ 도로", "⑤ 야적장", "확인·저장"]
-
-_GUIDE = {
-    0: "현장 위치로 지도를 이동·확대하세요. 카카오/네이버 지도에서 우클릭으로 "
-       "위경도를 복사해 아래에 붙여넣고 이동할 수도 있습니다. "
-       "건물 윤곽이 또렷이 보일 때까지(줌 18~19) 확대 후 [다음].",
-    1: "왼쪽 도구(⬠ 또는 ▭)로 **대지 경계를 1개** 그리세요. "
-       "⬠ 다각형: 꼭짓점 찍고 **더블클릭**으로 닫기. ▭ 사각형: 드래그. 다시 그리면 마지막 것 사용.",
-    2: "**신축 건물 외곽을 1개** 그리세요(▭ 권장). 다각형이면 외접 사각형으로 "
-       "변환됩니다. 아래에 높이·층수를 입력하세요.",
-    3: "**인접 건물들**을 그리세요(여러 개 가능, 없으면 바로 [다음]). 각 건물은 "
-       "외접 사각형으로 변환되며, 아래 표에서 이름·높이·층수를 수정하세요.",
-    4: "**주변 도로**를 그리세요(여러 개 가능, 도로 형상 그대로 사용). "
-       "아래 표에서 폭(m)을 수정하세요.",
-    5: "📍 도구로 **자재 야적장 위치를 1곳** 찍으세요. 운영가중 노출(F1) 계산의 "
-       "적재 경로 출발점입니다.",
-    6: "변환 결과를 확인하고 저장하세요. 수정하려면 [← 이전]으로 해당 단계로 "
-       "돌아가 다시 그리면 됩니다.",
-}
-
-
-# =============================================================================
-# 좌표 변환 (순수 함수 — 단위 테스트 대상)
-# =============================================================================
 def m_per_deg(lat_deg: float):
     """위도 lat에서 위도/경도 1도의 미터 환산값."""
     phi = math.radians(lat_deg)
