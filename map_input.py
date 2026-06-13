@@ -402,32 +402,32 @@ def render_map_wizard():
         _saved_ret = ss.get(f"mw_drawn_{step}", ret)
         polys, markers = _read_drawings(_saved_ret)
     else:
-        # 1~4단계: HTML 컴포넌트 — 그리는 도중 rerun 없음
-        try:
-            import streamlit as _st2
-            _vkey = _st2.secrets.get("VWORLD_KEY", "")
-        except Exception:
-            _vkey = ""
-        comp_result = _render_map_component(
-            ss["mw_center"], ss["mw_zoom"], vworld_key=_vkey, step=step)
-        # 컴포넌트에서 완료 버튼 눌렀을 때만 데이터 옴
-        if comp_result and isinstance(comp_result, dict) and "geojson" in comp_result:
-            ss[f"mw_drawn_{step}"] = comp_result
-            if comp_result.get("map_center"):
-                ss["mw_center"] = comp_result["map_center"]
-            if comp_result.get("map_zoom"):
-                ss["mw_zoom"] = comp_result["map_zoom"]
-        _saved = ss.get(f"mw_drawn_{step}")
-        if _saved and "geojson" in _saved:
-            feat = _saved["geojson"]
-            pts = _feature_latlng(feat)
-            g_type = feat.get("geometry", {}).get("type", "")
-            if g_type == "Point":
-                polys, markers = [], [pts[0]] if pts else []
-            else:
-                polys, markers = ([pts] if len(pts) >= 3 else []), []
-        else:
-            polys, markers = [], []
+        # 1~4단계: folium Draw — 도형은 매번 ret에서 읽고 session_state에 누적 저장
+        from streamlit_folium import st_folium
+        fmap = _make_map(ss["mw_center"], ss["mw_zoom"], "polygon", state)
+        ret = st_folium(fmap, key=f"mw_map_{step}", height=480,
+                        use_container_width=True,
+                        returned_objects=["all_drawings", "center", "zoom"])
+        # 지도 이동/줌 저장
+        if ret:
+            if ret.get("center"):
+                ss["mw_center"] = [ret["center"]["lat"], ret["center"]["lng"]]
+            if ret.get("zoom"):
+                ss["mw_zoom"] = ret["zoom"]
+            # 새 도형이 ret에 있으면 즉시 session_state에 저장 (rerun 대비)
+            if ret.get("all_drawings"):
+                ss[f"mw_drawn_{step}"] = ret
+        # 완료 버튼 — 명시적으로 다시 한 번 저장
+        _btn_col1, _btn_col2 = st.columns([1, 3])
+        if _btn_col1.button("✅ 그리기 완료", key=f"mw_done_{step}",
+                             type="primary", width="stretch"):
+            if ret and ret.get("all_drawings"):
+                ss[f"mw_drawn_{step}"] = ret
+            st.rerun()
+        _btn_col2.caption("그린 뒤 이 버튼을 누르세요 (도형 보존됨)")
+        # 저장된 도형 읽기
+        _saved_ret = ss.get(f"mw_drawn_{step}", ret)
+        polys, markers = _read_drawings(_saved_ret)
 
     # ---- 단계별 부가 입력 ----
     import pandas as pd
