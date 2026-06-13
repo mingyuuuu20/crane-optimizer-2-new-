@@ -414,8 +414,19 @@ def render_map_wizard():
         except Exception:
             _vkey = ""
 
+        # 이전 단계 대지 좌표 URL에 포함 (3단계 이상에서 대지 경계 표시)
+        import json as _jj2, urllib.parse as _up
+        _prev_pts = ""
+        if step > 1:
+            _lot_pts = ss.get("mw_latlng_1", [])
+            if _lot_pts:
+                _prev_pts = _up.quote(_jj2.dumps(_lot_pts))
+
         # 지도 그리기 페이지 URL (GitHub Pages)
         _map_url = (f"https://mingyuuuu20.github.io/crane-optimizer-2-new-/map_draw.html"
+                   f"?lat={_lat}&lng={_lng}&zoom={_zoom}&key={_vkey}"
+                   f"&lot={_prev_pts}" if _prev_pts else
+                   f"https://mingyuuuu20.github.io/crane-optimizer-2-new-/map_draw.html"
                    f"?lat={_lat}&lng={_lng}&zoom={_zoom}&key={_vkey}")
 
         st.info(
