@@ -24,23 +24,102 @@ _DEFAULT_CENTER = (35.1800, 128.1076)
 import os as _os
 import json as _json_mi
 
-def _render_map_component(center, zoom, vworld_key=""):
+def _render_map_component(center, zoom, vworld_key="", step=1):
     """
-    declare_component 방식 — 완료 버튼 클릭할 때만 Python으로 값 반환.
+    HTML 컴포넌트 — 완료 버튼 누르면 숨겨진 text_area에 GeoJSON 저장 → rerun.
     그리는 도중 rerun 없음.
     반환: {"geojson": ..., "map_center": [...], "map_zoom": ...} 또는 None
     """
+    import streamlit as _st2
     import streamlit.components.v1 as _cv1
-    _comp_dir = _os.path.join(_os.path.dirname(__file__), "map_component")
-    _map_draw = _cv1.declare_component("map_draw", path=_comp_dir)
-    result = _map_draw(
-        center=list(center),
-        zoom=int(zoom),
-        vworld_key=vworld_key,
-        default=None,
-        key=f"map_draw_comp",
-    )
-    return result
+    import json as _json2
+
+    _sess_key = f"mw_comp_result_{step}"
+
+    # HTML 파일 읽기
+    _html_path = _os.path.join(_os.path.dirname(__file__), "map_component", "index.html")
+    if _os.path.exists(_html_path):
+        html_content = open(_html_path, encoding="utf-8").read()
+    else:
+        _st2.error("map_component/index.html 파일이 없습니다.")
+        return None
+
+    # 초기 파라미터 + 결과 전달용 숨김 input ID 주입
+    _uid = f"mc_result_{step}"
+    init_script = f"""
+<script>
+window.addEventListener("load", function() {{
+  setTimeout(function() {{
+    if (typeof Streamlit !== "undefined") {{
+      Streamlit.setComponentReady();
+      Streamlit.setFrameHeight(540);
+    }}
+    if (typeof initMap === "function") {{
+      initMap({{
+        center: {list(center)},
+        zoom: {int(zoom)},
+        vworld_key: "{vworld_key}"
+      }});
+    }}
+  }}, 400);
+}});
+
+// 완료 버튼 클릭 시 부모 창으로 결과 전달
+function sendToStreamlit(data) {{
+  window.parent.postMessage({{
+    type: "MAPRESULT_{step}",
+    payload: JSON.stringify(data)
+  }}, "*");
+}}
+</script>
+<script>
+// 부모(Streamlit)에서 메시지 수신해서 hidden input에 저장
+window.parent.addEventListener("message", function() {{}}, false);
+</script>
+"""
+    html_content = html_content.replace("</body>", init_script + "</body>")
+
+    # 결과 수신용 숨김 text_area (height=0으로 숨김)
+    _result_key = f"_mc_hidden_{step}"
+    _stored = _st2.session_state.get(_sess_key)
+
+    # JS→Python 브릿지: postMessage를 Streamlit text_area로 전달하는 중간 HTML
+    bridge_html = f"""
+<script>
+window.addEventListener("message", function(e) {{
+  if (e.data && e.data.type === "MAPRESULT_{step}") {{
+    var ta = window.parent.document.querySelector('textarea[data-testid="stTextArea"][aria-label="{_result_key}"]');
+    if (!ta) {{
+      var inputs = window.parent.document.querySelectorAll('textarea');
+      for (var i=0; i<inputs.length; i++) {{
+        if (inputs[i].placeholder === "{_result_key}") {{ ta = inputs[i]; break; }}
+      }}
+    }}
+    if (ta) {{
+      var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.parent.HTMLTextAreaElement.prototype, 'value').set;
+      nativeInputValueSetter.call(ta, e.data.payload);
+      ta.dispatchEvent(new Event('input', {{ bubbles: true }}));
+    }}
+  }}
+}});
+</script>
+"""
+
+    _cv1.html(html_content, height=545, scrolling=False)
+    _cv1.html(bridge_html, height=0)
+
+    # 숨겨진 text_area로 결과 받기
+    import streamlit as st2
+    _raw = st2.text_area(_result_key, value="", key=_result_key,
+                         label_visibility="collapsed", height=1)
+    if _raw and _raw.strip():
+        try:
+            _data = _json2.loads(_raw)
+            st2.session_state[_sess_key] = _data
+            return _data
+        except Exception:
+            pass
+    return _st2.session_state.get(_sess_key)
 
 
 _DEFAULT_ZOOM = 16
@@ -416,7 +495,7 @@ def render_map_wizard():
         except Exception:
             _vkey = ""
         comp_result = _render_map_component(
-            ss["mw_center"], ss["mw_zoom"], vworld_key=_vkey)
+            ss["mw_center"], ss["mw_zoom"], vworld_key=_vkey, step=step)
         # 컴포넌트에서 완료 버튼 눌렀을 때만 데이터 옴
         if comp_result and isinstance(comp_result, dict) and "geojson" in comp_result:
             ss[f"mw_drawn_{step}"] = comp_result
