@@ -33,8 +33,8 @@ _GUIDE = {
     0: "현장 위치로 지도를 이동·확대하세요. 카카오/네이버 지도에서 우클릭으로 "
        "위경도를 복사해 아래에 붙여넣고 이동할 수도 있습니다. "
        "건물 윤곽이 또렷이 보일 때까지(줌 18~19) 확대 후 [다음].",
-    1: "왼쪽 도구(⬠ 또는 ▭)로 **대지 경계를 1개** 그리세요. 꼭짓점을 차례로 "
-       "찍고 첫 점을 다시 클릭하면 닫힙니다. 다시 그리면 마지막 것이 사용됩니다.",
+    1: "왼쪽 도구(⬠ 또는 ▭)로 **대지 경계를 1개** 그리세요. "
+       "⬠ 다각형: 꼭짓점 찍고 **더블클릭**으로 닫기. ▭ 사각형: 드래그. 다시 그리면 마지막 것 사용.",
     2: "**신축 건물 외곽을 1개** 그리세요(▭ 권장). 다각형이면 외접 사각형으로 "
        "변환됩니다. 아래에 높이·층수를 입력하세요.",
     3: "**인접 건물들**을 그리세요(여러 개 가능, 없으면 바로 [다음]). 각 건물은 "
@@ -199,6 +199,30 @@ def _make_map(center, zoom, draw_mode=None, state=None):
     folium.TileLayer(tiles=_ESRI_URL, attr="Esri — World Imagery",
                      name="위성사진", max_native_zoom=19, max_zoom=22).add_to(m)
 
+    # V-World 지적도 레이어 (API 키는 Streamlit Secrets에서 읽음)
+    try:
+        import streamlit as _st
+        _vkey = _st.secrets.get("VWORLD_KEY", "")
+        if _vkey:
+            folium.TileLayer(
+                tiles=f"https://api.vworld.kr/req/wmts/1.0.0/{_vkey}/Base/{{z}}/{{y}}/{{x}}.png",
+                attr="공간정보 오픈플랫폼(브이월드)",
+                name="브이월드 배경지도",
+                max_native_zoom=19, max_zoom=22,
+            ).add_to(m)
+            folium.WmsTileLayer(
+                url=f"https://api.vworld.kr/req/wms?key={_vkey}&",
+                layers="lt_c_landinfobasemap",
+                fmt="image/png",
+                transparent=True,
+                version="1.3.0",
+                name="🗺️ 지적도 (V-World)",
+                overlay=True,
+                control=True,
+            ).add_to(m)
+    except Exception:
+        pass
+
     # 이미 확정된 도형은 색으로 표시 (현재 단계 도형은 Draw 레이어가 담당)
     if state:
         def _poly(pts, color, name, dash=None):
@@ -221,8 +245,12 @@ def _make_map(center, zoom, draw_mode=None, state=None):
     if draw_mode:
         poly_on = draw_mode == "polygon"
         opts = {"polyline": False, "circle": False, "circlemarker": False,
-                "polygon": {"showArea": True, "allowIntersection": False}
-                if poly_on else False,
+                "polygon": {
+                    "showArea": True,
+                    "allowIntersection": False,
+                    "finishOn": "dblclick",
+                    "shapeOptions": {"color": "#F2B705", "weight": 3},
+                } if poly_on else False,
                 "rectangle": poly_on,
                 "marker": draw_mode == "marker"}
         Draw(export=False, draw_options=opts,
@@ -297,13 +325,20 @@ def render_map_wizard():
     fmap = _make_map(ss["mw_center"], ss["mw_zoom"], draw_mode, state)
     ret = st_folium(fmap, key=f"mw_map_{step}", height=520,
                     use_container_width=True,
-                    returned_objects=["all_drawings", "center", "zoom"])
-    if ret:
-        if ret.get("center"):
-            ss["mw_center"] = [ret["center"]["lat"], ret["center"]["lng"]]
-        if ret.get("zoom"):
-            ss["mw_zoom"] = ret["zoom"]
-    polys, markers = _read_drawings(ret)
+                    returned_objects=["all_drawings"],
+                    debounce=True)
+
+    # 그리기 완료 버튼 — 클릭 시점에만 도형을 읽어 rerun 루프 방지
+    if step not in (0, 6):
+        if st.button("✅ 그리기 완료 — 도형 인식", key=f"mw_done_{step}",
+                     type="primary"):
+            ss[f"mw_drawn_{step}"] = ret  # 이 시점의 ret을 저장
+            st.rerun()
+        # 저장된 ret 사용 (버튼 누른 이후)
+        _saved_ret = ss.get(f"mw_drawn_{step}", ret)
+    else:
+        _saved_ret = ret
+    polys, markers = _read_drawings(_saved_ret)
 
     # ---- 단계별 부가 입력 ----
     import pandas as pd
