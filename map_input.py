@@ -26,43 +26,20 @@ import json as _json_mi
 
 def _render_map_component(center, zoom, vworld_key=""):
     """
-    순수 HTML/JS 지도 컴포넌트 — 완료 버튼 클릭할 때만 Streamlit에 데이터 전송.
+    declare_component 방식 — 완료 버튼 클릭할 때만 Python으로 값 반환.
     그리는 도중 rerun 없음.
     반환: {"geojson": ..., "map_center": [...], "map_zoom": ...} 또는 None
     """
     import streamlit.components.v1 as _cv1
-    _html_path = _os.path.join(_os.path.dirname(__file__), "map_component", "index.html")
-    html_content = open(_html_path, encoding="utf-8").read()
-
-    # 초기 파라미터를 HTML에 주입
-    init_script = f"""
-<script>
-window.addEventListener("load", function() {{
-  window.parent.postMessage({{
-    type: "streamlit:render",
-    args: {{
-      center: {list(center)},
-      zoom: {zoom},
-      vworld_key: "{vworld_key}"
-    }}
-  }}, "*");
-  setTimeout(function() {{
-    window.dispatchEvent(new MessageEvent("message", {{
-      data: {{
-        type: "streamlit:render",
-        args: {{
-          center: {list(center)},
-          zoom: {zoom},
-          vworld_key: "{vworld_key}"
-        }}
-      }}
-    }}));
-  }}, 300);
-}});
-</script>
-"""
-    html_content = html_content.replace("</body>", init_script + "</body>")
-    result = _cv1.html(html_content, height=540, scrolling=False)
+    _comp_dir = _os.path.join(_os.path.dirname(__file__), "map_component")
+    _map_draw = _cv1.declare_component("map_draw", path=_comp_dir)
+    result = _map_draw(
+        center=list(center),
+        zoom=int(zoom),
+        vworld_key=vworld_key,
+        default=None,
+        key=f"map_draw_comp",
+    )
     return result
 
 
