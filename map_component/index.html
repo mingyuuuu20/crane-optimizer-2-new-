@@ -43,27 +43,25 @@
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/streamlit-component-lib@2.0.0/dist/index.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script>
-// Streamlit 컴포넌트 통신
+// Streamlit 컴포넌트 통신 (declare_component 방식)
 function sendToStreamlit(data) {
-  window.parent.postMessage({ type: "streamlit:setComponentValue", value: data }, "*");
+  Streamlit.setComponentValue(data);
 }
 
-// 초기 파라미터 수신
+// Streamlit 컴포넌트 초기화
 var params = {};
-window.addEventListener("message", function(e) {
-  if (e.data.type === "streamlit:render") {
-    params = e.data.args || {};
+function onRender(event) {
+  params = event.detail.args || {};
+  if (!map) {
     initMap(params);
   }
-});
-
-// Streamlit에 높이 알림
-function setHeight(h) {
-  window.parent.postMessage({ type: "streamlit:setFrameHeight", height: h }, "*");
 }
-setHeight(530);
+Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
+Streamlit.setComponentReady();
+Streamlit.setFrameHeight(530);
 
 var map, drawnItems, drawHandler;
 var vworldKey = "";
