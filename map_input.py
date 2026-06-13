@@ -325,8 +325,7 @@ def render_map_wizard():
     fmap = _make_map(ss["mw_center"], ss["mw_zoom"], draw_mode, state)
     ret = st_folium(fmap, key=f"mw_map_{step}", height=520,
                     use_container_width=True,
-                    returned_objects=["all_drawings"],
-                    debounce=True)
+                    returned_objects=["all_drawings"])
 
     # 그리기 완료 버튼 — 클릭 시점에만 도형을 읽어 rerun 루프 방지
     if step not in (0, 6):
