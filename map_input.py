@@ -219,6 +219,16 @@ def _make_map(center, zoom, draw_mode=None, state=None):
                 name="🗺️ 지적도 (V-World)",
                 overlay=True,
                 control=True,
+                max_zoom=22,
+                max_native_zoom=22,
+            ).add_to(m)
+            # 지적도 WMTS (줌 19 이상에서도 보이게)
+            folium.TileLayer(
+                tiles=f"https://api.vworld.kr/req/wmts/1.0.0/{_vkey}/LX/{{z}}/{{y}}/{{x}}.png",
+                attr="공간정보 오픈플랫폼(브이월드) 지적도",
+                name="🗺️ 지적도 WMTS",
+                max_native_zoom=22, max_zoom=22,
+                overlay=True,
             ).add_to(m)
     except Exception:
         pass
