@@ -21,6 +21,51 @@ import streamlit as st
 
 # 진주시청 부근 — 초기 지도 중심 기본값
 _DEFAULT_CENTER = (35.1800, 128.1076)
+import os as _os
+import json as _json_mi
+
+def _render_map_component(center, zoom, vworld_key=""):
+    """
+    순수 HTML/JS 지도 컴포넌트 — 완료 버튼 클릭할 때만 Streamlit에 데이터 전송.
+    그리는 도중 rerun 없음.
+    반환: {"geojson": ..., "map_center": [...], "map_zoom": ...} 또는 None
+    """
+    import streamlit.components.v1 as _cv1
+    _html_path = _os.path.join(_os.path.dirname(__file__), "map_component", "index.html")
+    html_content = open(_html_path, encoding="utf-8").read()
+
+    # 초기 파라미터를 HTML에 주입
+    init_script = f"""
+<script>
+window.addEventListener("load", function() {{
+  window.parent.postMessage({{
+    type: "streamlit:render",
+    args: {{
+      center: {list(center)},
+      zoom: {zoom},
+      vworld_key: "{vworld_key}"
+    }}
+  }}, "*");
+  setTimeout(function() {{
+    window.dispatchEvent(new MessageEvent("message", {{
+      data: {{
+        type: "streamlit:render",
+        args: {{
+          center: {list(center)},
+          zoom: {zoom},
+          vworld_key: "{vworld_key}"
+        }}
+      }}
+    }}));
+  }}, 300);
+}});
+</script>
+"""
+    html_content = html_content.replace("</body>", init_script + "</body>")
+    result = _cv1.html(html_content, height=540, scrolling=False)
+    return result
+
+
 _DEFAULT_ZOOM = 16
 
 _ESRI_URL = ("https://server.arcgisonline.com/ArcGIS/rest/services/"
@@ -256,15 +301,40 @@ def _make_map(center, zoom, draw_mode=None, state=None):
         poly_on = draw_mode == "polygon"
         opts = {"polyline": False, "circle": False, "circlemarker": False,
                 "polygon": {
-                    "showArea": True,
+                    "showArea": False,
                     "allowIntersection": False,
                     "finishOn": "dblclick",
-                    "shapeOptions": {"color": "#F2B705", "weight": 3},
+                    "shapeOptions": {"color": "#F2B705", "weight": 2},
+                    "icon": {
+                        "iconSize": [6, 6],
+                        "iconAnchor": [3, 3],
+                        "className": "leaflet-div-icon",
+                    },
+                    "touchIcon": {
+                        "iconSize": [8, 8],
+                        "iconAnchor": [4, 4],
+                        "className": "leaflet-div-icon",
+                    },
                 } if poly_on else False,
-                "rectangle": poly_on,
+                "rectangle": {
+                    "shapeOptions": {"color": "#F2B705", "weight": 2},
+                } if poly_on else False,
                 "marker": draw_mode == "marker"}
         Draw(export=False, draw_options=opts,
-             edit_options={"edit": True, "remove": True}).add_to(m)
+             edit_options={"edit": False, "remove": True}).add_to(m)
+        # 꼭짓점 아이콘 크기 줄이는 CSS 주입
+        m.get_root().html.add_child(folium.Element("""
+        <style>
+        .leaflet-div-icon {
+            width: 8px !important; height: 8px !important;
+            margin-left: -4px !important; margin-top: -4px !important;
+            background: #F2B705; border: 1px solid #333; border-radius: 2px;
+        }
+        .leaflet-touch .leaflet-div-icon {
+            width: 10px !important; height: 10px !important;
+        }
+        </style>
+        """))
 
     folium.LayerControl(position="topright").add_to(m)
     return m
@@ -330,30 +400,64 @@ def render_map_wizard():
             st.rerun()
 
     # ---- 지도 ----
-    draw_mode = (None if step in (0, 6)
-                 else "marker" if step == 5 else "polygon")
-    fmap = _make_map(ss["mw_center"], ss["mw_zoom"], draw_mode, state)
-    ret = st_folium(fmap, key=f"mw_map_{step}", height=520,
-                    use_container_width=True,
-                    returned_objects=["all_drawings", "center", "zoom"])
-    # 드래그/줌 이동 위치 저장
-    if ret:
-        if ret.get("center"):
-            ss["mw_center"] = [ret["center"]["lat"], ret["center"]["lng"]]
-        if ret.get("zoom"):
-            ss["mw_zoom"] = ret["zoom"]
-
-    # 그리기 완료 버튼 — 클릭 시점에만 도형을 읽어 rerun 루프 방지
-    if step not in (0, 6):
-        if st.button("✅ 그리기 완료 — 도형 인식", key=f"mw_done_{step}",
-                     type="primary"):
-            ss[f"mw_drawn_{step}"] = ret  # 이 시점의 ret을 저장
+    # 0단계(위치찾기)와 6단계(확인)는 기존 folium으로, 나머지는 HTML 컴포넌트
+    if step in (0, 6):
+        from streamlit_folium import st_folium
+        draw_mode = None
+        fmap = _make_map(ss["mw_center"], ss["mw_zoom"], draw_mode, state)
+        ret = st_folium(fmap, key=f"mw_map_{step}", height=480,
+                        use_container_width=True,
+                        returned_objects=["center", "zoom"])
+        if ret:
+            if ret.get("center"):
+                ss["mw_center"] = [ret["center"]["lat"], ret["center"]["lng"]]
+            if ret.get("zoom"):
+                ss["mw_zoom"] = ret["zoom"]
+        polys, markers = [], []
+    elif step == 5:
+        # 야적장: 마커는 기존 folium 유지
+        from streamlit_folium import st_folium
+        fmap = _make_map(ss["mw_center"], ss["mw_zoom"], "marker", state)
+        ret = st_folium(fmap, key=f"mw_map_{step}", height=480,
+                        use_container_width=True,
+                        returned_objects=["all_drawings", "center", "zoom"])
+        if ret:
+            if ret.get("center"):
+                ss["mw_center"] = [ret["center"]["lat"], ret["center"]["lng"]]
+            if ret.get("zoom"):
+                ss["mw_zoom"] = ret["zoom"]
+        if st.button("✅ 야적장 위치 저장", key=f"mw_done_{step}", type="primary"):
+            ss[f"mw_drawn_{step}"] = ret
             st.rerun()
-        # 저장된 ret 사용 (버튼 누른 이후)
         _saved_ret = ss.get(f"mw_drawn_{step}", ret)
+        polys, markers = _read_drawings(_saved_ret)
     else:
-        _saved_ret = ret
-    polys, markers = _read_drawings(_saved_ret)
+        # 1~4단계: HTML 컴포넌트 — 그리는 도중 rerun 없음
+        try:
+            import streamlit as _st2
+            _vkey = _st2.secrets.get("VWORLD_KEY", "")
+        except Exception:
+            _vkey = ""
+        comp_result = _render_map_component(
+            ss["mw_center"], ss["mw_zoom"], vworld_key=_vkey)
+        # 컴포넌트에서 완료 버튼 눌렀을 때만 데이터 옴
+        if comp_result and isinstance(comp_result, dict) and "geojson" in comp_result:
+            ss[f"mw_drawn_{step}"] = comp_result
+            if comp_result.get("map_center"):
+                ss["mw_center"] = comp_result["map_center"]
+            if comp_result.get("map_zoom"):
+                ss["mw_zoom"] = comp_result["map_zoom"]
+        _saved = ss.get(f"mw_drawn_{step}")
+        if _saved and "geojson" in _saved:
+            feat = _saved["geojson"]
+            pts = _feature_latlng(feat)
+            g_type = feat.get("geometry", {}).get("type", "")
+            if g_type == "Point":
+                polys, markers = [], [pts[0]] if pts else []
+            else:
+                polys, markers = ([pts] if len(pts) >= 3 else []), []
+        else:
+            polys, markers = [], []
 
     # ---- 단계별 부가 입력 ----
     import pandas as pd
