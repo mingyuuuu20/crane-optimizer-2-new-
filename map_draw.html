@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏗️ 현장 경계 그리기 — 타워크레인 배치 최적화</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Malgun Gothic', sans-serif; background: #0f2342; color: #fff; height: 100vh; display: flex; flex-direction: column; }
+#header {
+  background: linear-gradient(135deg, #0f2342, #1e3a66);
+  padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+#header h1 { font-size: 1rem; color: #fff; }
+.badge { background: #f2b705; color: #1b2a4a; border-radius: 20px; padding: 2px 10px; font-size: 0.72rem; font-weight: 700; }
+#toolbar {
+  background: #1e3a66; padding: 8px 12px;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+#toolbar span { font-size: 12px; color: #c9d6ea; font-weight: 600; }
+button {
+  padding: 5px 14px; border: none; border-radius: 6px;
+  cursor: pointer; font-size: 12px; font-weight: 700;
+}
+#btn-poly { background: #f2b705; color: #1b2a4a; }
+#btn-rect { background: #27497e; color: #fff; }
+#btn-clear { background: #c0392b; color: #fff; }
+#btn-done { background: #2e8b57; color: #fff; padding: 6px 18px; font-size: 13px; margin-left: auto; }
+#btn-done:disabled { background: #555; cursor: not-allowed; }
+#status { background: #162d52; color: #f2b705; font-size: 11px; padding: 5px 12px; min-height: 24px; }
+#map { flex: 1; }
+#result-panel {
+  display: none; background: #0f2342; border-top: 2px solid #f2b705;
+  padding: 12px 16px; max-height: 220px; overflow-y: auto;
+}
+#result-panel h3 { color: #f2b705; font-size: 13px; margin-bottom: 8px; }
+#result-box {
+  background: #1e3a66; border-radius: 6px; padding: 10px;
+  font-family: monospace; font-size: 11px; color: #c9d6ea;
+  white-space: pre-wrap; word-break: break-all; margin-bottom: 8px;
+}
+#btn-copy { background: #f2b705; color: #1b2a4a; padding: 6px 16px; font-size: 12px; font-weight: 700; border-radius: 6px; cursor: pointer; border: none; }
+#btn-copy.copied { background: #2e8b57; color: #fff; }
+#guide {
+  background: #162d52; padding: 8px 12px; font-size: 11px; color: #c9d6ea; border-top: 1px solid #27497e;
+}
+.leaflet-div-icon {
+  width: 8px !important; height: 8px !important;
+  margin-left: -4px !important; margin-top: -4px !important;
+  background: #f2b705; border: 1.5px solid #333; border-radius: 2px;
+}
+</style>
+</head>
+<body>
+<div id="header">
+  <h1>🏗️ 현장 경계 그리기</h1>
+  <span class="badge">타워크레인 배치 최적화 시스템</span>
+</div>
+<div id="toolbar">
+  <span>그리기 도구:</span>
+  <button id="btn-poly">⬠ 다각형</button>
+  <button id="btn-rect">▭ 사각형</button>
+  <button id="btn-clear">✕ 지우기</button>
+  <button id="btn-done" disabled>✅ 완료 — 좌표 생성</button>
+</div>
+<div id="status">지도를 원하는 위치로 이동·확대한 뒤 그리기 도구를 선택하세요.</div>
+<div id="map"></div>
+<div id="guide">
+  💡 <b>다각형</b>: 꼭짓점을 차례로 클릭 → 더블클릭으로 완성 &nbsp;|&nbsp;
+  <b>사각형</b>: 드래그로 그리기 &nbsp;|&nbsp;
+  지적도 레이어: 우상단 레이어 버튼에서 켜기
+</div>
+<div id="result-panel">
+  <h3>📋 생성된 좌표 코드 — 아래를 복사해서 앱에 붙여넣으세요</h3>
+  <div id="result-box"></div>
+  <button id="btn-copy">📋 클립보드에 복사</button>
+  <span id="copy-msg" style="margin-left:10px; font-size:11px; color:#2e8b57;"></span>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+<script>
+// URL 파라미터에서 초기 위치와 V-World 키 읽기
+var params = new URLSearchParams(window.location.search);
+var initLat = parseFloat(params.get('lat') || '35.18');
+var initLng = parseFloat(params.get('lng') || '128.1076');
+var initZoom = parseInt(params.get('zoom') || '17');
+var vworldKey = params.get('key') || '';
+
+var map = L.map('map', { center: [initLat, initLng], zoom: initZoom });
+
+// 기본 타일
+var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: 'OSM', maxZoom: 22, maxNativeZoom: 19
+});
+var esri = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  { attribution: 'Esri World Imagery', maxZoom: 22, maxNativeZoom: 19 }
+);
+esri.addTo(map);
+var baseLayers = { '일반지도(OSM)': osm, '위성사진(Esri)': esri };
+var overlays = {};
+
+// V-World 지적도
+if (vworldKey) {
+  var cadastre = L.tileLayer.wms('https://api.vworld.kr/req/wms?key=' + vworldKey + '&', {
+    layers: 'lt_c_landinfobasemap', format: 'image/png',
+    transparent: true, version: '1.3.0', maxZoom: 22
+  });
+  var vwBase = L.tileLayer(
+    'https://api.vworld.kr/req/wmts/1.0.0/' + vworldKey + '/Base/{z}/{y}/{x}.png',
+    { attribution: '브이월드', maxZoom: 22, maxNativeZoom: 22 }
+  );
+  overlays['🗺️ 지적도(V-World)'] = cadastre;
+  baseLayers['브이월드 배경'] = vwBase;
+  cadastre.addTo(map);
+}
+
+L.control.layers(baseLayers, overlays, { position: 'topright' }).addTo(map);
+L.control.scale({ imperial: true }).addTo(map);
+
+var drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+var drawHandler = null;
+
+map.on(L.Draw.Event.CREATED, function(e) {
+  drawnItems.clearLayers();
+  drawnItems.addLayer(e.layer);
+  document.getElementById('btn-done').disabled = false;
+  document.getElementById('status').textContent = '✅ 도형 완성! 우하단 "완료" 버튼을 눌러 좌표를 생성하세요.';
+  if (drawHandler) { drawHandler.disable(); drawHandler = null; }
+});
+
+document.getElementById('btn-poly').onclick = function() {
+  if (drawHandler) drawHandler.disable();
+  drawHandler = new L.Draw.Polygon(map, {
+    allowIntersection: false, showArea: false,
+    shapeOptions: { color: '#f2b705', weight: 2.5, fillOpacity: 0.15 },
+    icon: new L.DivIcon({ iconSize: [8,8], iconAnchor: [4,4], className: 'leaflet-div-icon' }),
+  });
+  drawHandler.enable();
+  document.getElementById('status').textContent = '⬠ 꼭짓점을 클릭해서 찍고, 더블클릭으로 완성하세요.';
+};
+
+document.getElementById('btn-rect').onclick = function() {
+  if (drawHandler) drawHandler.disable();
+  drawHandler = new L.Draw.Rectangle(map, {
+    shapeOptions: { color: '#f2b705', weight: 2.5, fillOpacity: 0.15 },
+  });
+  drawHandler.enable();
+  document.getElementById('status').textContent = '▭ 드래그해서 사각형을 그리세요.';
+};
+
+document.getElementById('btn-clear').onclick = function() {
+  drawnItems.clearLayers();
+  document.getElementById('btn-done').disabled = true;
+  document.getElementById('result-panel').style.display = 'none';
+  document.getElementById('status').textContent = '지워졌습니다. 다시 그리세요.';
+};
+
+document.getElementById('btn-done').onclick = function() {
+  var geojson = drawnItems.toGeoJSON();
+  if (!geojson.features || geojson.features.length === 0) return;
+  var feat = geojson.features[0];
+  var coords = feat.geometry.coordinates[0];
+  // [lng, lat] → [lat, lng] 변환
+  var latlngs = coords.map(function(c) { return [c[1], c[0]]; });
+  // 닫힘점 제거
+  if (latlngs.length > 1) {
+    var first = latlngs[0], last = latlngs[latlngs.length-1];
+    if (Math.abs(first[0]-last[0]) < 0.000001 && Math.abs(first[1]-last[1]) < 0.000001) {
+      latlngs = latlngs.slice(0, -1);
+    }
+  }
+  var center = map.getCenter();
+  var resultObj = {
+    type: 'lot_vertices',
+    latlng_pts: latlngs,
+    map_center: [center.lat, center.lng],
+    map_zoom: map.getZoom()
+  };
+  var resultStr = JSON.stringify(resultObj, null, 2);
+  document.getElementById('result-box').textContent = resultStr;
+  document.getElementById('result-panel').style.display = 'block';
+  document.getElementById('status').textContent = '좌표 생성 완료! 아래 코드를 복사해서 앱에 붙여넣으세요.';
+  // 결과 패널로 스크롤
+  document.getElementById('result-panel').scrollIntoView({ behavior: 'smooth' });
+};
+
+document.getElementById('btn-copy').onclick = function() {
+  var text = document.getElementById('result-box').textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    var btn = document.getElementById('btn-copy');
+    btn.textContent = '✅ 복사됨!';
+    btn.classList.add('copied');
+    document.getElementById('copy-msg').textContent = '클립보드에 복사되었습니다.';
+    setTimeout(function() {
+      btn.textContent = '📋 클립보드에 복사';
+      btn.classList.remove('copied');
+      document.getElementById('copy-msg').textContent = '';
+    }, 2000);
+  });
+};
+</script>
+</body>
+</html>
