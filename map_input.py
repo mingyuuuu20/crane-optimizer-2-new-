@@ -402,26 +402,71 @@ def render_map_wizard():
         _saved_ret = ss.get(f"mw_drawn_{step}", ret)
         polys, markers = _read_drawings(_saved_ret)
     else:
-        # 1~4단계: returned_objects=[] → 그리는 도중 rerun 없음 → 클릭 가능
-        # 완료 버튼 누를 때 session_state[key]에서 도형 읽기
-        from streamlit_folium import st_folium
-        _map_key = f"mw_map_{step}"
-        fmap = _make_map(ss["mw_center"], ss["mw_zoom"], "polygon", state)
-        st_folium(fmap, key=_map_key, height=480,
-                  use_container_width=True,
-                  returned_objects=[])  # 빈 리스트 = rerun 없음
+        # 1~4단계: 별도 페이지에서 그리고 결과 붙여넣기
+        _lat = ss["mw_center"][0]
+        _lng = ss["mw_center"][1]
+        _zoom = ss["mw_zoom"]
 
-        # 완료 버튼 누를 때만 session_state[key]에서 도형 읽어서 저장
-        if st.button("✅ 그리기 완료 — 도형 저장", key=f"mw_done_{step}",
-                     type="primary"):
-            _latest = st.session_state.get(_map_key, {})
-            if _latest.get("all_drawings"):
-                ss[f"mw_drawn_{step}"] = _latest
-            st.rerun()
+        # V-World 키
+        try:
+            import streamlit as _st3
+            _vkey = _st3.secrets.get("VWORLD_KEY", "")
+        except Exception:
+            _vkey = ""
 
-        # 이전에 저장된 도형 사용
-        _saved_ret = ss.get(f"mw_drawn_{step}", {})
-        polys, markers = _read_drawings(_saved_ret)
+        # 지도 그리기 페이지 URL (GitHub Pages)
+        _map_url = (f"https://mingyuuuu20.github.io/crane-optimizer-2-new-/map_draw.html"
+                   f"?lat={_lat}&lng={_lng}&zoom={_zoom}&key={_vkey}")
+
+        st.info(
+            "1. 아래 버튼으로 지도 페이지를 여세요  "
+            "2. 다각형/사각형으로 경계를 그리고 완료 버튼을 누르세요  "
+            "3. 생성된 코드를 복사해서 아래 칸에 붙여넣으세요",
+            icon="🗺️"
+        )
+        st.link_button(
+            "🗺️ 지도 그리기 페이지 열기 (새 탭)",
+            _map_url,
+            type="primary",
+        )
+
+        st.markdown("**그린 결과 붙여넣기:**")
+        _paste_key = f"mw_paste_{step}"
+        _pasted = st.text_area(
+            "지도 페이지에서 복사한 코드를 여기에 붙여넣으세요",
+            value=ss.get(_paste_key, ""),
+            height=120,
+            key=f"mw_ta_{step}",
+            placeholder='{"type": "lot_vertices", "latlng_pts": [...], ...}'
+        )
+
+        if st.button("✅ 좌표 확인 및 저장", key=f"mw_done_{step}", type="primary"):
+            if _pasted and _pasted.strip():
+                try:
+                    import json as _jj
+                    _data = _jj.loads(_pasted.strip())
+                    if "latlng_pts" in _data:
+                        ss[f"mw_paste_{step}"] = _pasted
+                        ss[f"mw_latlng_{step}"] = _data["latlng_pts"]
+                        if _data.get("map_center"):
+                            ss["mw_center"] = _data["map_center"]
+                        st.success("✅ 좌표 저장 완료!")
+                        st.rerun()
+                    else:
+                        st.error("올바른 형식이 아닙니다. 지도 페이지에서 복사한 코드를 그대로 붙여넣으세요.")
+                except Exception as _je:
+                    st.error(f"파싱 오류: {_je}")
+            else:
+                st.warning("먼저 지도 페이지에서 그린 뒤 코드를 붙여넣으세요.")
+
+        # 저장된 좌표로 polys 구성
+        _latlngs = ss.get(f"mw_latlng_{step}", [])
+        if _latlngs and len(_latlngs) >= 3:
+            polys = [_latlngs]
+            markers = []
+            st.success(f"✅ {len(_latlngs)}개 꼭짓점 저장됨")
+        else:
+            polys, markers = [], []
 
     # ---- 단계별 부가 입력 ----
     import pandas as pd
