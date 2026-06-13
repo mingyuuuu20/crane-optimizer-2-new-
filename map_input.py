@@ -21,6 +21,7 @@ import streamlit as st
 
 # 진주시청 부근 — 초기 지도 중심 기본값
 _DEFAULT_CENTER = (35.1800, 128.1076)
+_DEFAULT_ZOOM = 16
 import os as _os
 import json as _json_mi
 
