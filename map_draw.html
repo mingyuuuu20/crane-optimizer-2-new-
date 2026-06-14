@@ -288,10 +288,33 @@ function startDraw(DrawClass, opts) {
 }
 
 document.getElementById('btn-poly').onclick = function() {
+  // draw:drawvertex 이벤트로 면적 실시간 표시
+  // e.layers = 현재까지 찍힌 꼭짓점 마커들의 FeatureGroup
+  map.off('draw:drawvertex');
+  map.on('draw:drawvertex', function(e) {
+    var pts = [];
+    e.layers.eachLayer(function(l) {
+      if (l.getLatLng) pts.push(l.getLatLng());
+    });
+    if (pts.length >= 3) {
+      try {
+        var area = L.GeometryUtil.geodesicArea(pts);
+        var readable = L.GeometryUtil.readableArea(area, true);
+        document.getElementById('status').textContent =
+          '꼭짓점 ' + pts.length + '개 | 현재 면적: ' + readable + ' | 더블클릭으로 완성';
+      } catch(ex) {
+        document.getElementById('status').textContent =
+          '꼭짓점 ' + pts.length + '개 찍힘 | 더블클릭으로 완성';
+      }
+    } else {
+      document.getElementById('status').textContent =
+        '꼭짓점 ' + pts.length + '개 | 3개 이상 찍으면 면적 표시';
+    }
+  });
   startDraw(L.Draw.Polygon, { allowIntersection:false, showArea:true, metric:true, feet:false,
     shapeOptions:{color:'#f2b705',weight:2,fillOpacity:0.15},
     icon:new L.DivIcon({iconSize:[8,8],iconAnchor:[4,4],className:'leaflet-div-icon'}) });
-  document.getElementById('status').textContent = '꼭짓점 클릭 → 더블클릭으로 완성';
+  document.getElementById('status').textContent = '꼭짓점을 클릭하세요 | 더블클릭으로 완성';
 };
 document.getElementById('btn-rect').onclick = function() {
   startDraw(L.Draw.Rectangle, {shapeOptions:{color:'#f2b705',weight:2,fillOpacity:0.15}});
