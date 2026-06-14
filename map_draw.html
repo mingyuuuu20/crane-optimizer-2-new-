@@ -157,50 +157,59 @@ map.on('click', function(e) {
 
   document.getElementById('status').textContent = '📡 필지 정보 조회 중...';
 
-  // WFS 직접 호출 대신 GetMap 방식으로 필지 정보 조회
   var wfsUrl = 'https://api.vworld.kr/req/wfs?key=' + VWORLD_KEY +
-    '&service=WFS&version=2.0.0&request=GetFeature' +
-    '&typeNames=lp_pa_cbnd_bubun' +
-    '&count=1&outputFormat=application/json&srsName=EPSG:4326' +
+    '&service=WFS&version=1.1.0&request=GetFeature' +
+    '&typeName=lp_pa_cbnd_bubun' +
+    '&maxFeatures=1&outputFormat=application/json&srsName=EPSG:4326' +
     '&bbox=' + (lng-d) + ',' + (lat-d) + ',' + (lng+d) + ',' + (lat+d) + ',EPSG:4326';
 
-  fetch(wfsUrl)
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (!data.features || data.features.length === 0) {
-        document.getElementById('status').textContent = '⚠️ 해당 위치에 필지 정보가 없습니다. 더 확대하거나 다른 위치를 클릭하세요.';
-        return;
-      }
-      var feat = data.features[0];
-      var props = feat.properties || {};
-      var geom  = feat.geometry;
+  // JSONP 방식으로 CORS 우회 (브이월드 공식 방식)
+  var cbName = 'vwCb_' + Date.now();
+  var script = document.createElement('script');
+  var wfsJsonpUrl = wfsUrl + '&callback=' + cbName;
 
-      // 좌표 추출 (Polygon or MultiPolygon)
-      var coords;
-      if (geom.type === 'Polygon') {
-        coords = geom.coordinates[0];
-      } else if (geom.type === 'MultiPolygon') {
-        coords = geom.coordinates[0][0];
-      } else { return; }
+  window[cbName] = function(data) {
+    delete window[cbName];
+    document.head.removeChild(script);
 
-      // [lng,lat] → [lat,lng]
-      var latlngs = coords.map(function(c){ return [c[1], c[0]]; });
-      if (latlngs.length > 1) {
-        var f = latlngs[0], l = latlngs[latlngs.length-1];
-        if (Math.abs(f[0]-l[0])<0.000001 && Math.abs(f[1]-l[1])<0.000001)
-          latlngs = latlngs.slice(0,-1);
-      }
+    if (!data.features || data.features.length === 0) {
+      document.getElementById('status').textContent = '⚠️ 필지 정보 없음. 더 확대하거나 다른 위치를 클릭하세요.';
+      return;
+    }
+    var feat = data.features[0];
+    var props = feat.properties || {};
+    var geom  = feat.geometry;
 
-      // 지번 정보
-      var jibun = (props.bon_bun || '') + (props.bu_bun && props.bu_bun!='0' ? '-'+props.bu_bun : '');
-      var uname = props.uname || props.sido_name || '';
+    var coords;
+    if (geom.type === 'Polygon') {
+      coords = geom.coordinates[0];
+    } else if (geom.type === 'MultiPolygon') {
+      coords = geom.coordinates[0][0];
+    } else {
+      document.getElementById('status').textContent = '⚠️ 지원하지 않는 도형 형식입니다.';
+      return;
+    }
 
-      // 팝업으로 확인 후 추가
-      showBuildingPopup(e.latlng, latlngs, jibun, uname, props);
-    })
-    .catch(function(err) {
-      document.getElementById('status').textContent = '❌ 조회 실패: ' + err.message + ' (지도 더 확대 후 시도하세요)';
-    });
+    var latlngs = coords.map(function(c){ return [c[1], c[0]]; });
+    if (latlngs.length > 1) {
+      var f = latlngs[0], l = latlngs[latlngs.length-1];
+      if (Math.abs(f[0]-l[0])<0.000001 && Math.abs(f[1]-l[1])<0.000001)
+        latlngs = latlngs.slice(0,-1);
+    }
+
+    var jibun = (props.bon_bun || '') + (props.bu_bun && props.bu_bun!='0' ? '-'+props.bu_bun : '');
+    var uname = props.uname || props.sido_name || '';
+    showBuildingPopup(e.latlng, latlngs, jibun, uname, props);
+  };
+
+  script.onerror = function() {
+    delete window[cbName];
+    document.head.removeChild(script);
+    document.getElementById('status').textContent = '❌ 조회 실패. 지도를 더 확대하거나 다른 위치를 클릭하세요.';
+  };
+
+  script.src = wfsJsonpUrl;
+  document.head.appendChild(script);
 });
 
 function showBuildingPopup(latlng, latlngs, jibun, uname, props) {
