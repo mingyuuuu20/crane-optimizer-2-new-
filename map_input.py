@@ -418,7 +418,9 @@ def render_map_wizard():
         import json as _jj2, urllib.parse as _up
         _prev_pts = ""
         if step > 1:
-            _lot_pts = ss.get("mw_latlng_1", [])
+            # mw_shapes_1에서 대지 좌표 읽기
+            _lot_shapes = ss.get("mw_shapes_1", [])
+            _lot_pts = _lot_shapes[0]["latlng_pts"] if _lot_shapes else ss.get("mw_latlng_1", [])
             if _lot_pts:
                 _prev_pts = _up.quote(_jj2.dumps(_lot_pts))
 
