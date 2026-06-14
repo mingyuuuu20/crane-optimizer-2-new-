@@ -407,10 +407,10 @@ def render_map_wizard():
         _lng = ss["mw_center"][1]
         _zoom = ss["mw_zoom"]
 
-        # V-World 키
+        # V-World 키 (지도 그리기 페이지용 별도 키 사용)
         try:
             import streamlit as _st3
-            _vkey = _st3.secrets.get("VWORLD_KEY", "")
+            _vkey = _st3.secrets.get("VWORLD_KEY_DRAW", _st3.secrets.get("VWORLD_KEY", ""))
         except Exception:
             _vkey = ""
 
