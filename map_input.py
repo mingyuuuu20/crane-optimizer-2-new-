@@ -418,10 +418,13 @@ def render_map_wizard():
         import json as _jj2, urllib.parse as _up
         _prev_pts = ""
         if step > 1:
-            # mw_shapes_1에서 대지 좌표 읽기
-            _lot_shapes = ss.get("mw_shapes_1", [])
-            _lot_pts = _lot_shapes[0]["latlng_pts"] if _lot_shapes else ss.get("mw_latlng_1", [])
-            if _lot_pts:
+            # state["lot"]에 저장된 대지 좌표 사용 (1단계 완료 시 _commit_step이 저장)
+            _lot_pts = state.get("lot", [])
+            if not _lot_pts:
+                # 폴백: mw_shapes_1
+                _lot_shapes = ss.get("mw_shapes_1", [])
+                _lot_pts = _lot_shapes[0]["latlng_pts"] if _lot_shapes else []
+            if _lot_pts and len(_lot_pts) >= 3:
                 _prev_pts = _up.quote(_jj2.dumps(_lot_pts))
 
         # 지도 그리기 페이지 URL (GitHub Pages)
