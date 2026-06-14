@@ -213,6 +213,32 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 # ① 부지·환경 탭
 # =============================================================================
 with tab1:
+    # ── 임시 WFS 테스트 (확인 후 삭제) ──
+    with st.expander("🔧 [임시] WFS 테스트", expanded=False):
+        if st.button("새 키로 WFS 테스트", key="wfs_test2"):
+            import urllib.request as _ur, json as _jj
+            _KEY = "D82F8BEE-01DB-3486-8C51-433AC82F21C2"
+            _lat, _lng = 35.1800, 128.1076
+            _d = 0.0002
+            _url = (f"https://api.vworld.kr/ned/wfs/getCtnlgsSpcePWFS?"
+                   f"key={_KEY}&typename=dt_d002"
+                   f"&bbox={_lng-_d},{_lat-_d},{_lng+_d},{_lat+_d},EPSG:4326"
+                   f"&maxfeatures=1&outputformat=application/json&srsname=EPSG:4326")
+            try:
+                _req = _ur.Request(_url, headers={
+                    'Referer': 'https://crane-lmg.streamlit.app',
+                    'User-Agent': 'Mozilla/5.0'
+                })
+                _r = _ur.urlopen(_req, timeout=10)
+                _data = _jj.loads(_r.read())
+                st.success(f"✅ 성공! features: {_data.get('totalFeatures', '?')}")
+                if _data.get("features"):
+                    f0 = _data["features"][0]
+                    st.json({"geometry_type": f0["geometry"]["type"],
+                             "props": list(f0.get("properties", {}).keys())[:5]})
+            except Exception as _e:
+                st.error(f"❌ 실패: {_e}")
+    # ── 임시 테스트 끝 ──
 
     col1, col2 = st.columns([1.2, 1])
 
