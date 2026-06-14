@@ -113,6 +113,14 @@ if (VWORLD_KEY) {
   });
   overlays['🗺️ 지적도'] = cadastre;
   cadastre.addTo(map);
+
+  // 브이월드 정사영상 — 지적도와 좌표계가 동일한 항공 정사영상
+  // 일반 위성사진(Esri)과 달리 지적도와 정합이 맞아서 오버레이 비교 가능
+  var vwSatellite = L.tileLayer(
+    'https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY+'/Satellite/{z}/{y}/{x}.jpeg',
+    { attribution:'브이월드 정사영상', maxZoom:22, maxNativeZoom:19 }
+  );
+  baseLayers['🛰️ 정사영상(V-World)'] = vwSatellite;
 }
 L.control.layers(baseLayers, overlays, {position:'topright'}).addTo(map);
 L.control.scale({imperial:true}).addTo(map);
@@ -164,9 +172,12 @@ map.on('click', function(e) {
     '&bbox=' + (lng-d) + ',' + (lat-d) + ',' + (lng+d) + ',' + (lat+d) + ',EPSG:4326';
 
   // JSONP 방식으로 CORS 우회 (브이월드 공식 방식)
+  // FORMAT_OPTIONS=callback:함수명 + outputFormat=text/javascript
   var cbName = 'vwCb_' + Date.now();
   var script = document.createElement('script');
-  var wfsJsonpUrl = wfsUrl + '&callback=' + cbName;
+  var wfsJsonpUrl = wfsUrl
+    .replace('outputFormat=application/json', 'outputFormat=text/javascript')
+    + '&FORMAT_OPTIONS=callback:' + cbName;
 
   window[cbName] = function(data) {
     delete window[cbName];
