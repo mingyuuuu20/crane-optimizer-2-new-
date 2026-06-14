@@ -158,7 +158,8 @@ _meta = ACTIVE_SITE.metadata
 st.markdown(
     f"**현재 부지**: {_meta.get('display_name', 'Site')}  "
     f"({SITE_AREA_OFFICIAL_M2:.1f}㎡, {_meta.get('zoning', '용도지역 미상')})  |  "
-    f"**알고리즘**: NSGA-II 다목적 최적화"
+    f"**알고리즘**: NSGA-II 다목적 최적화  |  "
+    f"**캡스톤 디자인** · 건축공학과"
 )
 
 st.divider()
@@ -212,6 +213,30 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 # ① 부지·환경 탭
 # =============================================================================
 with tab1:
+    # ── 임시 WFS 테스트 (확인 후 삭제) ──────────────────────────────
+    with st.expander("🔧 [임시] WFS API 테스트", expanded=False):
+        if st.button("WFS 테스트 실행", key="wfs_test"):
+            import urllib.request as _ur, json as _jj
+            _KEY = "D82F8BEE-01DB-3486-8C51-433AC82F21C2"
+            _lat, _lng = 35.1800, 128.1076
+            _d = 0.0002
+            _url = (f"https://api.vworld.kr/ned/wfs/getCtnlgsSpcePWFS?"
+                   f"key={_KEY}&typename=dt_d002"
+                   f"&bbox={_lng-_d},{_lat-_d},{_lng+_d},{_lat+_d},EPSG:4326"
+                   f"&maxfeatures=1&outputformat=application/json&srsname=EPSG:4326")
+            try:
+                _req = _ur.Request(_url, headers={
+                    'Referer': 'https://crane-lmg.streamlit.app',
+                    'User-Agent': 'Mozilla/5.0'
+                })
+                _r = _ur.urlopen(_req, timeout=10)
+                _data = _jj.loads(_r.read())
+                st.success(f"✅ 성공! features: {_data.get('totalFeatures', _data.get('numberMatched', '?'))}")
+                if _data.get("features"):
+                    st.json(_data["features"][0]["geometry"]["type"])
+            except Exception as _e:
+                st.error(f"❌ 실패: {_e}")
+    # ── 임시 테스트 끝 ──────────────────────────────────────────────
     col1, col2 = st.columns([1.2, 1])
 
     with col1:
@@ -1011,5 +1036,6 @@ st.divider()
 st.caption(
     "출처: KOSHA GUIDE C-104·C-50 / KDS 41 12 00 / 산안기준규칙 / "
     "ISO 31000 / 손승현 외 (2022) 한국건축시공학회지 / "
-    "Manitowoc·Liebherr 공식 데이터시트"
+    "Manitowoc·Liebherr 공식 데이터시트  |  "
+    "캡스톤 디자인 — 건축공학과"
 )
