@@ -157,11 +157,12 @@ map.on('click', function(e) {
 
   document.getElementById('status').textContent = '📡 필지 정보 조회 중...';
 
+  // WFS 직접 호출 대신 GetMap 방식으로 필지 정보 조회
   var wfsUrl = 'https://api.vworld.kr/req/wfs?key=' + VWORLD_KEY +
-    '&service=WFS&version=1.1.0&request=GetFeature' +
-    '&typeName=lp_pa_cbnd_bubun' +
-    '&bbox=' + (lng-d) + ',' + (lat-d) + ',' + (lng+d) + ',' + (lat+d) + ',EPSG:4326' +
-    '&maxFeatures=1&outputFormat=application/json&srsName=EPSG:4326';
+    '&service=WFS&version=2.0.0&request=GetFeature' +
+    '&typeNames=lp_pa_cbnd_bubun' +
+    '&count=1&outputFormat=application/json&srsName=EPSG:4326' +
+    '&bbox=' + (lng-d) + ',' + (lat-d) + ',' + (lng+d) + ',' + (lat+d) + ',EPSG:4326';
 
   fetch(wfsUrl)
     .then(function(r) { return r.json(); })
@@ -287,7 +288,7 @@ function startDraw(DrawClass, opts) {
 }
 
 document.getElementById('btn-poly').onclick = function() {
-  startDraw(L.Draw.Polygon, { allowIntersection:false, showArea:false,
+  startDraw(L.Draw.Polygon, { allowIntersection:false, showArea:true, metric:true, feet:false,
     shapeOptions:{color:'#f2b705',weight:2,fillOpacity:0.15},
     icon:new L.DivIcon({iconSize:[8,8],iconAnchor:[4,4],className:'leaflet-div-icon'}) });
   document.getElementById('status').textContent = '꼭짓점 클릭 → 더블클릭으로 완성';
