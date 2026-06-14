@@ -213,6 +213,57 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 # ① 부지·환경 탭
 # =============================================================================
 with tab1:
+    # ── 임시 API 테스트 (확인 후 삭제) ──
+    with st.expander("🔧 [임시] 카카오+건축물대장 테스트", expanded=False):
+        if st.button("API 테스트 실행", key="api_test"):
+            import urllib.request as _ur, json as _jj
+            _lat, _lng = 35.1800, 128.1076
+
+            # 카카오 역지오코딩
+            _KAKAO = "c21676d31779f142f371f20d2c71e861"
+            _url1 = f"https://dapi.kakao.com/v2/local/geo/coord2address.json?x={_lng}&y={_lat}"
+            try:
+                _req1 = _ur.Request(_url1, headers={'Authorization': f'KakaoAK {_KAKAO}'})
+                _r1 = _ur.urlopen(_req1, timeout=8)
+                _d1 = _jj.loads(_r1.read())
+                _docs = _d1.get("documents", [])
+                if _docs:
+                    _addr = _docs[0].get("address", {})
+                    st.success(f"✅ 카카오 성공! 주소: {_addr.get('address_name')} / 법정동코드: {_addr.get('b_code')}")
+                    st.session_state["_test_bcode"] = _addr.get("b_code", "")
+                    st.session_state["_test_main"] = _addr.get("main_address_no", "")
+                    st.session_state["_test_sub"] = _addr.get("sub_address_no", "0")
+                else:
+                    st.warning(f"카카오 응답 없음: {_d1}")
+            except Exception as _e:
+                st.error(f"❌ 카카오 실패: {_e}")
+
+            # 건축물대장
+            _BLD = "mJiMm5gtdFSd3eIsRECuE%2FIRanwWwbKVW%2BRYGUNZvxscV5wVFhFNH%2FqVVJuxvi2%2F8n%2F9ntZhpxZscf%2Bdv1xfSw%3D%3D"
+            _bcode = st.session_state.get("_test_bcode", "4817010200")
+            _sigungu = _bcode[:5] if _bcode else "48170"
+            _bjdong = _bcode[5:] if _bcode else "10200"
+            _main = st.session_state.get("_test_main", "291")
+            _sub = st.session_state.get("_test_sub", "6")
+            _url2 = (f"https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?"
+                    f"serviceKey={_BLD}&sigunguCd={_sigungu}&bjdongCd={_bjdong}"
+                    f"&bun={int(_main):04d}&ji={int(_sub) if _sub else 0:04d}"
+                    f"&numOfRows=1&_type=json")
+            try:
+                _req2 = _ur.Request(_url2, headers={'User-Agent': 'Mozilla/5.0'})
+                _r2 = _ur.urlopen(_req2, timeout=10)
+                _d2 = _jj.loads(_r2.read())
+                _items = _d2.get("response", {}).get("body", {}).get("items", {})
+                _item = _items.get("item", []) if _items else []
+                if isinstance(_item, dict): _item = [_item]
+                if _item:
+                    _i = _item[0]
+                    st.success(f"✅ 건축물대장 성공! 층수: {_i.get('grndFlrCnt')}층, 높이: {_i.get('heit')}m, 용도: {_i.get('mainPurpsCdNm')}")
+                else:
+                    st.warning(f"건축물대장 응답: {str(_d2)[:200]}")
+            except Exception as _e:
+                st.error(f"❌ 건축물대장 실패: {_e}")
+    # ── 임시 테스트 끝 ──
     # ── 임시 WFS 테스트 (확인 후 삭제) ──
     with st.expander("🔧 [임시] WFS 테스트", expanded=False):
         if st.button("새 키로 WFS 테스트", key="wfs_test2"):
