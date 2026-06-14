@@ -456,12 +456,19 @@ def render_map_wizard():
                 try:
                     import json as _jj
                     _data = _jj.loads(_pasted.strip())
+                    if _data.get("map_center"):
+                        ss["mw_center"] = _data["map_center"]
+                    # 단일 도형 (lot_vertices)
                     if "latlng_pts" in _data:
                         ss[f"mw_paste_{step}"] = _pasted
-                        ss[f"mw_latlng_{step}"] = _data["latlng_pts"]
-                        if _data.get("map_center"):
-                            ss["mw_center"] = _data["map_center"]
+                        ss[f"mw_shapes_{step}"] = [{"shape_type":"polygon","latlng_pts":_data["latlng_pts"]}]
                         st.success("✅ 좌표 저장 완료!")
+                        st.rerun()
+                    # 여러 도형 (multi_shapes)
+                    elif "shapes" in _data:
+                        ss[f"mw_paste_{step}"] = _pasted
+                        ss[f"mw_shapes_{step}"] = _data["shapes"]
+                        st.success(f"✅ 도형 {len(_data['shapes'])}개 저장 완료!")
                         st.rerun()
                     else:
                         st.error("올바른 형식이 아닙니다. 지도 페이지에서 복사한 코드를 그대로 붙여넣으세요.")
@@ -470,12 +477,19 @@ def render_map_wizard():
             else:
                 st.warning("먼저 지도 페이지에서 그린 뒤 코드를 붙여넣으세요.")
 
-        # 저장된 좌표로 polys 구성
-        _latlngs = ss.get(f"mw_latlng_{step}", [])
-        if _latlngs and len(_latlngs) >= 3:
-            polys = [_latlngs]
+        # 저장된 도형으로 polys/markers 구성
+        _shapes = ss.get(f"mw_shapes_{step}", [])
+        if _shapes:
+            polys = []
             markers = []
-            st.success(f"✅ {len(_latlngs)}개 꼭짓점 저장됨")
+            for _sh in _shapes:
+                _pts = _sh.get("latlng_pts", [])
+                if _sh.get("shape_type") == "marker" and _pts:
+                    markers.append(_pts[0])
+                elif len(_pts) >= 3:
+                    polys.append(_pts)
+            if polys or markers:
+                st.success(f"✅ 저장됨 — 다각형 {len(polys)}개, 마커 {len(markers)}개")
         else:
             polys, markers = [], []
 
