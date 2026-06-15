@@ -12,40 +12,24 @@ body { font-family: 'Malgun Gothic', sans-serif; background: #0f2342; color: #ff
 #header { background: linear-gradient(135deg,#0f2342,#1e3a66); padding: 8px 14px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 #header h1 { font-size: 0.95rem; color: #fff; }
 .badge { background: #f2b705; color: #1b2a4a; border-radius: 20px; padding: 2px 10px; font-size: 0.7rem; font-weight: 700; }
-#mode-bar { background: #162d52; padding: 6px 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #27497e; }
-#mode-bar span { font-size: 12px; color: #c9d6ea; font-weight: 600; }
-.mode-btn { padding: 5px 14px; border: 2px solid transparent; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 700; }
-.mode-btn.active { border-color: #f2b705; }
-#btn-mode-click { background: #2e8b57; color: #fff; }
-#btn-mode-draw { background: #27497e; color: #fff; }
-#toolbar { background: #1e3a66; padding: 6px 12px; display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
+#shape-count { color: #f2b705; font-size: 12px; font-weight: 700; margin-left: 8px; }
+#toolbar { background: #1e3a66; padding: 7px 12px; display: flex; gap: 7px; align-items: center; flex-wrap: wrap; }
 #toolbar span { font-size: 12px; color: #c9d6ea; font-weight: 600; }
 button { padding: 5px 13px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 700; }
 #btn-poly { background: #f2b705; color: #1b2a4a; }
 #btn-rect { background: #27497e; color: #fff; }
-#btn-marker { background: #6a5acd; color: #fff; }
 #btn-undo { background: #555; color: #fff; }
 #btn-done { background: #2e8b57; color: #fff; padding: 6px 16px; font-size: 13px; margin-left: auto; }
 #btn-done:disabled { background: #444; cursor: not-allowed; color: #888; }
-#shape-count { color: #f2b705; font-size: 12px; font-weight: 700; margin-left: 8px; }
 #status { background: #162d52; color: #f2b705; font-size: 11px; padding: 4px 12px; min-height: 22px; }
 #map { flex: 1; }
-#guide { background: #162d52; padding: 5px 12px; font-size: 11px; color: #c9d6ea; border-top: 1px solid #27497e; }
+#guide { background: #162d52; padding: 6px 12px; font-size: 11px; color: #c9d6ea; border-top: 1px solid #27497e; }
 #result-panel { display:none; background:#0f2342; border-top:2px solid #f2b705; padding:12px 16px; max-height:200px; overflow-y:auto; }
 #result-panel h3 { color:#f2b705; font-size:13px; margin-bottom:8px; }
 #result-box { background:#1e3a66; border-radius:6px; padding:10px; font-family:monospace; font-size:11px; color:#c9d6ea; white-space:pre-wrap; word-break:break-all; margin-bottom:8px; }
 #btn-copy { background:#f2b705; color:#1b2a4a; padding:6px 16px; font-size:12px; font-weight:700; border-radius:6px; cursor:pointer; border:none; }
 #btn-copy.copied { background:#2e8b57; color:#fff; }
-/* 필지 선택 모드 커서 */
-.click-mode { cursor: crosshair !important; }
 .leaflet-div-icon { width:8px!important; height:8px!important; margin-left:-4px!important; margin-top:-4px!important; background:#f2b705; border:1.5px solid #333; border-radius:2px; }
-/* 건물 팝업 */
-.bldg-popup { font-size: 12px; min-width: 180px; }
-.bldg-popup h4 { color: #16335B; margin-bottom: 6px; font-size: 13px; }
-.bldg-popup table { width: 100%; border-collapse: collapse; }
-.bldg-popup td { padding: 2px 4px; border-bottom: 1px solid #eee; }
-.bldg-popup td:first-child { color: #666; width: 70px; }
-.bldg-popup .btn-add { background: #2e8b57; color: #fff; border: none; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-weight: 700; margin-top: 6px; width: 100%; }
 </style>
 </head>
 <body>
@@ -54,27 +38,19 @@ button { padding: 5px 13px; border: none; border-radius: 6px; cursor: pointer; f
   <span class="badge">타워크레인 배치 최적화</span>
   <span id="shape-count"></span>
 </div>
-<div id="mode-bar">
-  <span>입력 방식:</span>
-  <button class="mode-btn active" id="btn-mode-click" onclick="setMode('click')">🖱️ 필지 클릭 (자동)</button>
-  <button class="mode-btn" id="btn-mode-draw" onclick="setMode('draw')">✏️ 직접 그리기</button>
-  <span id="mode-desc" style="color:#f2b705;font-size:11px;">필지를 클릭하면 경계선이 자동으로 추가됩니다</span>
-</div>
 <div id="toolbar">
-  <span id="toolbar-label">도구:</span>
-  <span id="draw-tools" style="display:none;gap:7px;display:none;">
-    <button id="btn-poly">⬠ 다각형</button>
-    <button id="btn-rect">▭ 사각형</button>
-    <button id="btn-marker">📍 마커</button>
-  </span>
+  <span>도구:</span>
+  <button id="btn-poly">⬠ 다각형</button>
+  <button id="btn-rect">▭ 사각형</button>
   <button id="btn-undo">↩ 마지막 삭제</button>
   <button id="btn-done" disabled>✅ 완료 — 좌표 생성</button>
 </div>
-<div id="status">지도를 원하는 위치로 이동·확대한 뒤 필지를 클릭하세요.</div>
+<div id="status">지도를 이동·확대한 뒤 도구를 선택해 그리세요.</div>
 <div id="map"></div>
 <div id="guide">
-  💡 <b>필지 클릭 모드</b>: 건물 있는 필지 클릭 → 경계선 자동 추가 + 층수 조회 &nbsp;|&nbsp;
-  레이어 전환: 우상단 버튼
+  💡 <b>다각형</b>: 꼭짓점 클릭 → 더블클릭으로 완성 &nbsp;|&nbsp;
+  <b>사각형</b>: 드래그 &nbsp;|&nbsp;
+  <b>정사영상(V-World)</b>: 레이어 버튼에서 선택 → 지적도 선이 건물 외벽과 일치
 </div>
 <div id="result-panel">
   <h3>📋 생성된 좌표 — 복사해서 앱에 붙여넣으세요</h3>
@@ -93,19 +69,13 @@ var initZoom  = parseInt(params.get('zoom')   || '18');
 var VWORLD_KEY = params.get('key') || '';
 var lotParam   = params.get('lot') || '';
 
-var currentMode = 'click'; // 'click' or 'draw'
-var shapeList   = [];
-var drawHandler = null;
-var drawnItems;
-
-// ── 지도 초기화 ──────────────────────────────────────────────
 var map = L.map('map', { center:[initLat,initLng], zoom:initZoom });
 
 var osm  = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'OSM', maxZoom:22, maxNativeZoom:19 });
 var esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{ attribution:'Esri', maxZoom:22, maxNativeZoom:19 });
 esri.addTo(map);
-var baseLayers = {'일반지도':osm,'위성사진':esri};
-var overlays   = {};
+var baseLayers = {'일반지도':osm,'위성사진(Esri)':esri};
+var overlays = {};
 
 if (VWORLD_KEY) {
   var cadastre = L.tileLayer.wms('https://api.vworld.kr/req/wms?key='+VWORLD_KEY+'&', {
@@ -114,8 +84,6 @@ if (VWORLD_KEY) {
   overlays['🗺️ 지적도'] = cadastre;
   cadastre.addTo(map);
 
-  // 브이월드 정사영상 — 지적도와 좌표계가 동일한 항공 정사영상
-  // 일반 위성사진(Esri)과 달리 지적도와 정합이 맞아서 오버레이 비교 가능
   var vwSatellite = L.tileLayer(
     'https://api.vworld.kr/req/wmts/1.0.0/'+VWORLD_KEY+'/Satellite/{z}/{y}/{x}.jpeg',
     { attribution:'브이월드 정사영상', maxZoom:22, maxNativeZoom:19 }
@@ -124,8 +92,6 @@ if (VWORLD_KEY) {
 }
 L.control.layers(baseLayers, overlays, {position:'topright'}).addTo(map);
 L.control.scale({imperial:true}).addTo(map);
-
-drawnItems = new L.FeatureGroup().addTo(map);
 
 // 이전 단계 대지 경계 표시
 if (lotParam) {
@@ -139,210 +105,67 @@ if (lotParam) {
   } catch(e) {}
 }
 
-// ── 모드 전환 ─────────────────────────────────────────────────
-function setMode(mode) {
-  currentMode = mode;
-  document.getElementById('btn-mode-click').classList.toggle('active', mode==='click');
-  document.getElementById('btn-mode-draw').classList.toggle('active',  mode==='draw');
-  var drawTools = document.getElementById('draw-tools');
-  if (mode === 'click') {
-    drawTools.style.display = 'none';
-    document.getElementById('mode-desc').textContent = '필지를 클릭하면 경계선이 자동으로 추가됩니다';
-    document.getElementById('status').textContent = '건물이 있는 필지를 클릭하세요.';
-    if (drawHandler) { drawHandler.disable(); drawHandler = null; }
-  } else {
-    drawTools.style.display = 'flex';
-    document.getElementById('mode-desc').textContent = '도형 도구로 직접 그리세요';
-    document.getElementById('status').textContent = '도구를 선택해 그리세요.';
-  }
+var drawnItems = new L.FeatureGroup().addTo(map);
+var drawHandler = null;
+var shapeList = [];
+
+function updateCount() {
+  var n = shapeList.length;
+  document.getElementById('shape-count').textContent = n > 0 ? '도형 '+n+'개' : '';
+  document.getElementById('btn-done').disabled = (n === 0);
 }
 
-// ── 필지 클릭 → WFS 조회 ────────────────────────────────────
-map.on('click', function(e) {
-  if (currentMode !== 'click') return;
-  var lat = e.latlng.lat, lng = e.latlng.lng;
-  var d = 0.00008;
-
-  document.getElementById('status').textContent = '📡 필지 정보 조회 중...';
-
-  var wfsUrl = 'https://api.vworld.kr/req/wfs?key=' + VWORLD_KEY +
-    '&service=WFS&version=1.1.0&request=GetFeature' +
-    '&typeName=lp_pa_cbnd_bubun' +
-    '&maxFeatures=1&outputFormat=application/json&srsName=EPSG:4326' +
-    '&bbox=' + (lng-d) + ',' + (lat-d) + ',' + (lng+d) + ',' + (lat+d) + ',EPSG:4326';
-
-  // JSONP 방식으로 CORS 우회 (브이월드 공식 방식)
-  // FORMAT_OPTIONS=callback:함수명 + outputFormat=text/javascript
-  var cbName = 'vwCb_' + Date.now();
-  var script = document.createElement('script');
-  var wfsJsonpUrl = wfsUrl
-    .replace('outputFormat=application/json', 'outputFormat=text/javascript')
-    + '&FORMAT_OPTIONS=callback:' + cbName;
-
-  window[cbName] = function(data) {
-    delete window[cbName];
-    document.head.removeChild(script);
-
-    if (!data.features || data.features.length === 0) {
-      document.getElementById('status').textContent = '⚠️ 필지 정보 없음. 더 확대하거나 다른 위치를 클릭하세요.';
-      return;
-    }
-    var feat = data.features[0];
-    var props = feat.properties || {};
-    var geom  = feat.geometry;
-
-    var coords;
-    if (geom.type === 'Polygon') {
-      coords = geom.coordinates[0];
-    } else if (geom.type === 'MultiPolygon') {
-      coords = geom.coordinates[0][0];
-    } else {
-      document.getElementById('status').textContent = '⚠️ 지원하지 않는 도형 형식입니다.';
-      return;
-    }
-
-    var latlngs = coords.map(function(c){ return [c[1], c[0]]; });
-    if (latlngs.length > 1) {
-      var f = latlngs[0], l = latlngs[latlngs.length-1];
-      if (Math.abs(f[0]-l[0])<0.000001 && Math.abs(f[1]-l[1])<0.000001)
-        latlngs = latlngs.slice(0,-1);
-    }
-
-    var jibun = (props.bon_bun || '') + (props.bu_bun && props.bu_bun!='0' ? '-'+props.bu_bun : '');
-    var uname = props.uname || props.sido_name || '';
-    showBuildingPopup(e.latlng, latlngs, jibun, uname, props);
-  };
-
-  script.onerror = function() {
-    delete window[cbName];
-    document.head.removeChild(script);
-    document.getElementById('status').textContent = '❌ 조회 실패. 지도를 더 확대하거나 다른 위치를 클릭하세요.';
-  };
-
-  script.src = wfsJsonpUrl;
-  document.head.appendChild(script);
-});
-
-function showBuildingPopup(latlng, latlngs, jibun, uname, props) {
-  // 임시 필지 표시
-  var tmpLayer = L.polygon(latlngs, {color:'#f2b705', weight:2, fillOpacity:0.15, dashArray:'4,4'}).addTo(map);
-
-  var popupHtml = '<div class="bldg-popup">' +
-    '<h4>📍 선택된 필지</h4>' +
-    '<table>' +
-    '<tr><td>지번</td><td><b>' + (jibun||'-') + '</b></td></tr>' +
-    '<tr><td>지역</td><td>' + (uname||'-') + '</td></tr>' +
-    '</table>' +
-    '<div style="margin-top:8px">' +
-    '<label style="font-size:11px;color:#666">층수 (직접 입력): <input id="popup-floors" type="number" value="3" min="1" max="80" style="width:50px;margin-left:4px"></label><br>' +
-    '<label style="font-size:11px;color:#666;margin-top:4px;display:block">높이m: <input id="popup-height" type="number" value="9" min="1" max="300" style="width:50px;margin-left:4px"></label><br>' +
-    '<label style="font-size:11px;color:#666;margin-top:4px;display:block">이름: <input id="popup-name" type="text" value="인접건물" style="width:100px;margin-left:4px"></label>' +
-    '</div>' +
-    '<button class="btn-add" onclick="addParcel()">✅ 이 필지 추가</button>' +
-    '<button class="btn-add" style="background:#c0392b;margin-top:4px" onclick="cancelParcel()">✕ 취소</button>' +
-    '</div>';
-
-  var popup = L.popup({maxWidth:240}).setLatLng(latlng).setContent(popupHtml).openOn(map);
-
-  window._tmpLayer = tmpLayer;
-  window._pendingLatlngs = latlngs;
-  window._pendingJibun = jibun;
-
-  popup.on('remove', function() {
-    if (window._tmpLayer) { map.removeLayer(window._tmpLayer); window._tmpLayer = null; }
-  });
-}
-
-window.addParcel = function() {
-  var floors  = parseInt(document.getElementById('popup-floors').value) || 3;
-  var height  = parseFloat(document.getElementById('popup-height').value) || (floors*3);
-  var name    = document.getElementById('popup-name').value || '인접건물';
-  var latlngs = window._pendingLatlngs;
-
-  // 확정 레이어 추가
-  var layer = L.polygon(latlngs, {color:'#e74c3c', weight:2, fillColor:'#e74c3c', fillOpacity:0.2});
-  layer.bindTooltip(name + ' (' + floors + 'F)', {permanent:true, direction:'center', className:'', offset:[0,0]});
-  drawnItems.addLayer(layer);
-
-  shapeList.push({ layer:layer, type:'polygon', latlng_pts:latlngs, name:name, floors:floors, height_m:height });
-  updateCount();
-
-  map.closePopup();
-  if (window._tmpLayer) { map.removeLayer(window._tmpLayer); window._tmpLayer = null; }
-  document.getElementById('status').textContent = '✅ "' + name + '" 추가됨 (총 ' + shapeList.length + '개). 계속 클릭하거나 완료 버튼을 누르세요.';
-};
-
-window.cancelParcel = function() {
-  map.closePopup();
-  if (window._tmpLayer) { map.removeLayer(window._tmpLayer); window._tmpLayer = null; }
-  document.getElementById('status').textContent = '취소됨. 다른 필지를 클릭하세요.';
-};
-
-// ── 직접 그리기 모드 ───────────────────────────────────────────
 map.on(L.Draw.Event.CREATED, function(e) {
   var layer = e.layer, type = e.layerType;
   drawnItems.addLayer(layer);
   var latlngs;
-  if (type === 'marker') {
-    var ll = layer.getLatLng();
-    latlngs = [[ll.lat, ll.lng]];
-  } else {
-    var raw = layer.getLatLngs();
-    var ring = Array.isArray(raw[0]) ? raw[0] : raw;
-    latlngs = ring.map(function(p){ return [p.lat, p.lng]; });
-    if (latlngs.length > 1) {
-      var f=latlngs[0], l=latlngs[latlngs.length-1];
-      if (Math.abs(f[0]-l[0])<0.000001 && Math.abs(f[1]-l[1])<0.000001) latlngs=latlngs.slice(0,-1);
-    }
+  var raw = layer.getLatLngs();
+  var ring = Array.isArray(raw[0]) ? raw[0] : raw;
+  latlngs = ring.map(function(p){ return [p.lat, p.lng]; });
+  if (latlngs.length > 1) {
+    var f=latlngs[0], l=latlngs[latlngs.length-1];
+    if (Math.abs(f[0]-l[0])<0.000001 && Math.abs(f[1]-l[1])<0.000001) latlngs=latlngs.slice(0,-1);
   }
   shapeList.push({layer:layer, type:type, latlng_pts:latlngs, name:'도형'+(shapeList.length+1), floors:3, height_m:9});
   updateCount();
-  document.getElementById('status').textContent = '도형 '+shapeList.length+'개. 계속 그리거나 완료 버튼을 누르세요.';
+  document.getElementById('status').textContent = '도형 '+shapeList.length+'개 완성. 계속 그리거나 완료 버튼을 누르세요.';
   if (drawHandler) { drawHandler.disable(); drawHandler = null; }
 });
 
-function startDraw(DrawClass, opts) {
-  if (drawHandler) drawHandler.disable();
-  drawHandler = new DrawClass(map, opts||{});
-  drawHandler.enable();
-}
-
+// 다각형 면적 실시간 표시
 document.getElementById('btn-poly').onclick = function() {
-  // draw:drawvertex 이벤트로 면적 실시간 표시
-  // e.layers = 현재까지 찍힌 꼭짓점 마커들의 FeatureGroup
   map.off('draw:drawvertex');
   map.on('draw:drawvertex', function(e) {
     var pts = [];
-    e.layers.eachLayer(function(l) {
-      if (l.getLatLng) pts.push(l.getLatLng());
-    });
+    e.layers.eachLayer(function(l) { if (l.getLatLng) pts.push(l.getLatLng()); });
     if (pts.length >= 3) {
       try {
         var area = L.GeometryUtil.geodesicArea(pts);
         var readable = L.GeometryUtil.readableArea(area, true);
-        document.getElementById('status').textContent =
-          '꼭짓점 ' + pts.length + '개 | 현재 면적: ' + readable + ' | 더블클릭으로 완성';
+        document.getElementById('status').textContent = '꼭짓점 '+pts.length+'개 | 현재 면적: '+readable+' | 더블클릭으로 완성';
       } catch(ex) {
-        document.getElementById('status').textContent =
-          '꼭짓점 ' + pts.length + '개 찍힘 | 더블클릭으로 완성';
+        document.getElementById('status').textContent = '꼭짓점 '+pts.length+'개 | 더블클릭으로 완성';
       }
     } else {
-      document.getElementById('status').textContent =
-        '꼭짓점 ' + pts.length + '개 | 3개 이상 찍으면 면적 표시';
+      document.getElementById('status').textContent = '꼭짓점 '+pts.length+'개 | 3개 이상 찍으면 면적 표시';
     }
   });
-  startDraw(L.Draw.Polygon, { allowIntersection:false, showArea:true, metric:true, feet:false,
+  if (drawHandler) drawHandler.disable();
+  drawHandler = new L.Draw.Polygon(map, {
+    allowIntersection:false, showArea:true, metric:true, feet:false,
     shapeOptions:{color:'#f2b705',weight:2,fillOpacity:0.15},
-    icon:new L.DivIcon({iconSize:[8,8],iconAnchor:[4,4],className:'leaflet-div-icon'}) });
+    icon:new L.DivIcon({iconSize:[8,8],iconAnchor:[4,4],className:'leaflet-div-icon'})
+  });
+  drawHandler.enable();
   document.getElementById('status').textContent = '꼭짓점을 클릭하세요 | 더블클릭으로 완성';
 };
+
 document.getElementById('btn-rect').onclick = function() {
-  startDraw(L.Draw.Rectangle, {shapeOptions:{color:'#f2b705',weight:2,fillOpacity:0.15}});
+  map.off('draw:drawvertex');
+  if (drawHandler) drawHandler.disable();
+  drawHandler = new L.Draw.Rectangle(map, {shapeOptions:{color:'#f2b705',weight:2,fillOpacity:0.15}});
+  drawHandler.enable();
   document.getElementById('status').textContent = '드래그해서 사각형을 그리세요.';
-};
-document.getElementById('btn-marker').onclick = function() {
-  startDraw(L.Draw.Marker);
-  document.getElementById('status').textContent = '위치를 클릭하세요.';
 };
 
 document.getElementById('btn-undo').onclick = function() {
@@ -352,13 +175,6 @@ document.getElementById('btn-undo').onclick = function() {
   updateCount();
   document.getElementById('status').textContent = '마지막 도형 삭제됨.';
 };
-
-// ── 완료 ──────────────────────────────────────────────────────
-function updateCount() {
-  var n = shapeList.length;
-  document.getElementById('shape-count').textContent = n > 0 ? '도형 '+n+'개' : '';
-  document.getElementById('btn-done').disabled = (n === 0);
-}
 
 document.getElementById('btn-done').onclick = function() {
   var center = map.getCenter();
