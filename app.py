@@ -393,6 +393,46 @@ with tab3:
             for k in ("opt_F", "opt_X", "opt_mode", "opt_cons"):
                 st.session_state.pop(k, None)
         st.success(f"완료! Pareto front 크기: {len(F) if F is not None else 0}")
+        if F is None or len(F) == 0:
+            st.error(
+                "⚠️ 제약을 모두 만족하는 크레인 배치를 찾지 못했습니다.\n\n"
+                "협소대지에서 자주 발생합니다. 아래를 확인해 보세요:"
+            )
+            # 대지 중앙에서 제약 진단
+            try:
+                import constraints as _Cdiag
+                _site = ACTIVE_SITE
+                _ccx, _ccy = _site.SITE.centroid.x, _site.SITE.centroid.y
+                _fail_count = {}
+                for _mdl in ["Potain_MDT_178", "Potain_MR_160C", "Liebherr_280_HC_L"]:
+                    for _jb in [25, 30, 35, 40, 45]:
+                        _ok, _det = _Cdiag.evaluate_crane_placement(
+                            (_ccx, _ccy), _mdl, 40, _jb)
+                        for _k, _v in _det.items():
+                            if isinstance(_v, tuple) and not _v[0]:
+                                _fail_count[_k] = _fail_count.get(_k, 0) + 1
+                if _fail_count:
+                    _sorted_fails = sorted(_fail_count.items(),
+                                           key=lambda x: -x[1])
+                    _msg_map = {
+                        "C2-1": "인접 건물과 너무 가까움 → 인접 건물을 더 멀리 그리거나 다시 확인",
+                        "C2-3": "선회반경이 인접 대지를 크게 침범 → 대지가 너무 좁거나 인접 대지 동의 필요",
+                        "C7": "신축 건물과 크레인 설치 공간 부족 → 신축 건물을 더 작게",
+                        "C5": "양중점을 다 못 덮음 → 더 긴 지브 필요",
+                        "C1": "인양 능력 부족",
+                        "C6": "마스트 높이 부족",
+                    }
+                    _lines = []
+                    for _k, _cnt in _sorted_fails[:4]:
+                        _lines.append(f"- **{_k}**: {_msg_map.get(_k, _k)}")
+                    st.markdown("**주요 제약 위반 (대지 중앙 기준):**\n" +
+                                "\n".join(_lines))
+                    st.caption("💡 가장 흔한 원인: 대지에 비해 신축 건물이 크거나, "
+                               "인접 건물이 대지 안으로 들어와 있는 경우입니다. "
+                               "➕ 내 현장 만들기에서 신축 건물을 대지 안에 더 작게, "
+                               "인접 건물은 대지 밖에 그려 보세요.")
+            except Exception as _de:
+                st.caption(f"(진단 생략: {_de})")
         if cons_info and cons_info.get("agreement_m") is not None:
             ag = cons_info["agreement_m"]
             if ag <= 3.0:
