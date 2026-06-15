@@ -148,6 +148,8 @@ def build_site_obj_from_wizard(s: dict) -> dict:
     bx0, by0, bx1, by1 = min(bxs), min(bys), max(bxs), max(bys)
     if (bx1 - bx0) < 2.0 or (by1 - by0) < 2.0:
         raise ValueError("신축 건물이 너무 작습니다 (한 변 2 m 이상 필요).")
+    # 다각형 그대로 저장 (bounding box 대신)
+    bld_poly = [[round(p[0],2), round(p[1],2)] for p in bld]
 
     adj_list = []
     for i, a in enumerate(s.get("adj", [])):
@@ -187,7 +189,8 @@ def build_site_obj_from_wizard(s: dict) -> dict:
         "coordinate_system": {"origin": "site centroid", "x_axis": "East (+)",
                               "y_axis": "North (+)", "unit": "meter"},
         "lot_vertices": lot,
-        "planned_building": {"footprint_box": [round(bx0, 2), round(by0, 2),
+        "planned_building": {"footprint": bld_poly,
+                             "footprint_box": [round(bx0, 2), round(by0, 2),
                                                round(bx1, 2), round(by1, 2)],
                              "height_m": float(s.get("bld_h", 30.0)),
                              "floors": int(s.get("bld_fl", 10)),
@@ -657,15 +660,23 @@ def _preview_local(obj):
     ax.add_patch(MplPoly(obj["lot_vertices"], fc="#FFF3CD", ec="k",
                          lw=2.2, zorder=3))
     bx0, by0, bx1, by1 = obj["planned_building"]["footprint_box"]
-    ax.add_patch(Rect((bx0, by0), bx1 - bx0, by1 - by0, fc="none",
-                      ec="#2E6FD8", lw=1.6, zorder=4))
+    # 다각형이 있으면 그대로, 없으면 bounding box
+    _bld_fp = obj["planned_building"].get("footprint")
+    if _bld_fp and len(_bld_fp) >= 3:
+        ax.add_patch(MplPoly(_bld_fp, fc="none", ec="#2E6FD8", lw=1.6, zorder=4))
+        _bcx = sum(p[0] for p in _bld_fp) / len(_bld_fp)
+        _bcy = sum(p[1] for p in _bld_fp) / len(_bld_fp)
+    else:
+        ax.add_patch(Rect((bx0, by0), bx1 - bx0, by1 - by0, fc="none",
+                          ec="#2E6FD8", lw=1.6, zorder=4))
+        _bcx, _bcy = (bx0 + bx1) / 2, (by0 + by1) / 2
     yx, yy = obj["lift_points"]["material_yard"]
     ax.plot([yx], [yy], marker="*", ms=16, color="#2E8B57", zorder=5)
     ax.annotate("야적장", (yx, yy), textcoords="offset points",
                 xytext=(6, 6), fontsize=8, color="#2E8B57",
                 fontweight="bold",
                 bbox=dict(fc="white", ec="none", alpha=0.75, pad=1.2))
-    ax.text((bx0 + bx1) / 2, (by0 + by1) / 2, "신축 건물", ha="center",
+    ax.text(_bcx, _bcy, "신축 건물", ha="center",
             va="center", fontsize=8.5, color="#2E6FD8", fontweight="bold")
     ax.set_aspect("equal"); ax.grid(alpha=0.3)
     ax.set_xlabel("East (m)"); ax.set_ylabel("North (m)")
