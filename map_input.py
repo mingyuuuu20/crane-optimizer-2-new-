@@ -36,8 +36,9 @@ _GUIDE = {
        "⬠ 다각형: 꼭짓점 찍고 **더블클릭**으로 닫기. ▭ 사각형: 드래그. 다시 그리면 마지막 것 사용.",
     2: "**신축 건물 외곽을 1개** 그리세요(▭ 권장). 다각형이면 외접 사각형으로 "
        "변환됩니다. 아래에 높이·층수를 입력하세요.",
-    3: "**인접 건물들**을 그리세요(여러 개 가능, 없으면 바로 [다음]). 각 건물은 "
-       "외접 사각형으로 변환되며, 아래 표에서 이름·높이·층수를 수정하세요.",
+    3: "**인접 건물들**을 그리세요(여러 개 가능, 없으면 바로 [다음]). "
+       "레이어에서 **🛰️ 정사영상(V-World)**으로 전환하면 지적도 선이 건물 외벽과 정확히 일치합니다. "
+       "지적도 선 따라 그리세요. 아래 표에서 이름·높이·층수를 수정하세요.",
     4: "**주변 도로**를 그리세요(여러 개 가능, 도로 형상 그대로 사용). "
        "아래 표에서 폭(m)을 수정하세요.",
     5: "📍 도구로 **자재 야적장 위치를 1곳** 찍으세요. 운영가중 노출(F1) 계산의 "
@@ -396,11 +397,24 @@ def render_map_wizard():
                 ss["mw_center"] = [ret["center"]["lat"], ret["center"]["lng"]]
             if ret.get("zoom"):
                 ss["mw_zoom"] = ret["zoom"]
+            # 마커가 있으면 즉시 저장 (rerun 대비)
+            if ret.get("all_drawings"):
+                ss[f"mw_drawn_{step}"] = ret
         if st.button("✅ 야적장 위치 저장", key=f"mw_done_{step}", type="primary"):
-            ss[f"mw_drawn_{step}"] = ret
+            if ret and ret.get("all_drawings"):
+                ss[f"mw_drawn_{step}"] = ret
+            # 저장된 거 없어도 현재 ret 기준으로 저장
+            if not ss.get(f"mw_drawn_{step}"):
+                ss[f"mw_drawn_{step}"] = ret
             st.rerun()
+        # 저장된 마커 읽기 — rerun 후에도 보존
         _saved_ret = ss.get(f"mw_drawn_{step}", ret)
         polys, markers = _read_drawings(_saved_ret)
+        # 마커가 있으면 state에도 바로 반영 (다음 버튼 활성화용)
+        if markers and not state.get("yard"):
+            state["yard"] = markers[-1]
+        if state.get("yard"):
+            st.success(f"✅ 야적장 위치 저장됨")
     else:
         # 1~4단계: 별도 페이지에서 그리고 결과 붙여넣기
         _lat = ss["mw_center"][0]
