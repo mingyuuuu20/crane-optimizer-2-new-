@@ -151,10 +151,42 @@ def check_C1_lifting_capacity(crane_xy, model, payload_kgf=PAYLOAD_MAX_KGF):
 # =============================================================================
 
 def _crane_swept_radius(model: str, jib_length: float) -> float:
-    """T형: 카운터지브도 weather-vane → 두 중 큰 값. 러핑: 지브만."""
+    """T형: 카운터지브도 weather-vane → 두 중 큰 값. 러핑: 지브만.
+
+    NOTE: 위치 비의존 버전(하위호환). 가능하면 _operating_radius() 사용.
+    """
     spec = CRANE_MODELS[model]
     if spec["type"] == "hammerhead":
         return max(jib_length, spec["counter_jib_length_m"])
+    return jib_length
+
+
+# 러핑 크레인이 가장 먼 양중점에 닿기 위해 필요한 안전여유 (m)
+#   [근거] 러핑 지브는 각도를 세워 작업 반경을 줄인다. 모든 양중점에 닿는
+#   '최소 필요 반경'은 (최원거리 양중점 + 후크 여유)이며, 침범·이격 계산도
+#   지브 길이 전체가 아니라 이 실제 작업 반경으로 해야 협소대지 현실과 맞다.
+#   출처: Luffing jib crane은 좁은 수직 범위에서 작동해 인접 공역 침범을
+#   최소화한다 (P&E, Cranepedia, Cranes Today 업계 자료).
+LUFF_RADIUS_MARGIN_M = 1.5
+
+
+def _operating_radius(crane_xy, model, jib_length):
+    """침범·이격 계산에 쓰는 '실제 작업 선회반경'.
+
+    - T형(hammerhead): 카운터지브 weather-vane 포함 full swept = max(jib, counter).
+      (지브 수평 고정이므로 작업 반경 축소 불가)
+    - 러핑(luffing): 모든 양중점에 닿는 최소 반경
+      = min(jib_length, 최원거리 양중점 + margin).
+      지브를 세워 반경을 줄이는 러핑 특성 반영.
+    """
+    spec = CRANE_MODELS[model]
+    if spec["type"] == "hammerhead":
+        return max(jib_length, spec["counter_jib_length_m"])
+    # 러핑: 최원거리 양중점까지 거리
+    crane_pt = Point(crane_xy)
+    if len(LIFT_POINTS) > 0:
+        r_far = max(crane_pt.distance(Point(p)) for p in LIFT_POINTS)
+        return min(jib_length, r_far + LUFF_RADIUS_MARGIN_M)
     return jib_length
 
 
@@ -226,7 +258,7 @@ def check_C2_1_building_clearance(crane_xy, model, jib_length):
     Level 1 검증과 알고리즘 최적해가 일관됨.
     """
     spec = CRANE_MODELS[model]
-    swept_r = _crane_swept_radius(model, jib_length)
+    swept_r = _operating_radius(crane_xy, model, jib_length)
     crane_pt = Point(crane_xy)
 
     # 러핑은 sector, T형은 full circle — continuous_constraints 와 동일
@@ -266,7 +298,7 @@ def check_C2_3_no_lot_intrusion(crane_xy, model, jib_length):
     C2-1 과 평가 기준이 불일치하는 버그가 있어 sector 처리로 수정 (v2.5.20).
     """
     spec = CRANE_MODELS[model]
-    swept_r = _crane_swept_radius(model, jib_length)
+    swept_r = _operating_radius(crane_xy, model, jib_length)
     crane_pt = Point(crane_xy)
 
     # 러핑은 sector, T형은 full circle — C2-1 과 동일 기준
@@ -502,7 +534,7 @@ def continuous_constraints(crane_xy, model, mast_height_m, jib_length_m):
 
     # --- G2: 인접 구조물 이격 (가장 가까운 건물과의 부족량) ---
     # 러핑: operational sector, T형: full circle (카운터지브 weather-vane)
-    swept_r = _crane_swept_radius(model, jib_length_m)
+    swept_r = _operating_radius(crane_xy, model, jib_length_m)
     if spec["type"] == "hammerhead":
         operating_area = crane_pt.buffer(swept_r)
     else:
