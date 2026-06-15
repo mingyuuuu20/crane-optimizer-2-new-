@@ -213,29 +213,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 # ① 부지·환경 탭
 # =============================================================================
 with tab1:
-    # ── 임시 WFS 프록시 테스트 ──
-    with st.expander("🔧 [임시] WFS 프록시 테스트", expanded=False):
-        if st.button("WFS 테스트", key="wfs_proxy_test"):
-            import urllib.request as _ur, json as _jj
-            _KEY = "F4868FF5-D279-364F-8F70-AD7C3B0DF6E9"
-            _url = (f"https://api.vworld.kr/req/wfs?key={_KEY}"
-                   f"&service=WFS&version=1.1.0&request=GetFeature"
-                   f"&typeName=lp_pa_cbnd_bubun"
-                   f"&maxFeatures=1&outputFormat=application/json&srsName=EPSG:4326"
-                   f"&bbox=127.019,37.523,127.022,37.526,EPSG:4326")
-            try:
-                _r = _ur.urlopen(_ur.Request(_url, headers={'User-Agent':'Mozilla/5.0'}), timeout=10)
-                _d = _jj.loads(_r.read())
-                st.success(f"✅ 성공! features: {_d.get('totalFeatures','?')}")
-                if _d.get("features"):
-                    st.json(_d["features"][0]["geometry"]["type"])
-            except Exception as _e:
-                _b = ""
-                if hasattr(_e,'read'):
-                    try: _b = _e.read().decode()
-                    except: pass
-                st.error(f"❌ 실패: {_e} | {_b[:200]}")
-    # ── 임시 테스트 끝 ──
+
 
 
     col1, col2 = st.columns([1.2, 1])
