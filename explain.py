@@ -108,3 +108,99 @@ def build_explanation(x, F_row, F_all, mode="static",
         "전문가 검토가 필요합니다."
     )
     return "\n\n".join(lines)
+
+
+def build_headline(x, F_row, agreement_m=None, n_seeds=None):
+    """knee 해를 '추천 한 문장 + 핵심 숫자 3개'로 요약.
+
+    반환: dict {
+        "headline": 한 줄 추천 문장 (markdown),
+        "metrics": [(라벨, 값, 보조설명), ...] 길이 3,
+        "confidence": 재현성 한 줄 or None,
+    }
+    비전문가가 결과 화면을 처음 봤을 때 '무엇을 하라는 건지'가 한눈에 들어오도록.
+    """
+    cx, cy = float(x[0]), float(x[1])
+    model = MODEL_LIST[int(np.clip(x[2], 0, 2))]
+    jib, mast = float(x[3]), float(x[4])
+    spec_name = MODEL_KO.get(model, model)
+    f1, f2 = float(F_row[0]), float(F_row[1])
+    days = f2 / 8.0
+
+    headline = (
+        f"**{spec_name}** 크레인을 부지 좌표 **({cx:.0f}, {cy:.0f})** 지점에 "
+        f"설치하는 안을 추천합니다. 지브 길이는 **{jib:.0f} m**가 적절합니다."
+    )
+
+    metrics = [
+        ("추천 기종", spec_name.split(" (")[0],
+         spec_name.split("(")[1].rstrip(")") if "(" in spec_name else ""),
+        ("예상 양중 기간", f"{days:.1f}일",
+         f"순수 작업시간 {f2:.0f}시간 기준"),
+        ("제3자 안전위험", f"{f1:.0f}점",
+         "낮을수록 안전 (도로·인접건물 노출 종합)"),
+    ]
+
+    confidence = None
+    if agreement_m is not None and n_seeds:
+        if agreement_m <= 3.0:
+            confidence = (
+                f"독립적으로 {n_seeds}번 다시 계산해도 추천 위치가 최대 "
+                f"{agreement_m:.1f} m 안에서 일치 — 신뢰할 수 있는 결과입니다."
+            )
+        else:
+            confidence = (
+                f"{n_seeds}번의 독립 계산 중 일부 편차({agreement_m:.1f} m)가 "
+                f"있었으나, 합의 과정에서 열등한 결과는 자동 제거되었습니다."
+            )
+
+    return {"headline": headline, "metrics": metrics, "confidence": confidence}
+
+
+def compute_baseline_improvement(x):
+    """추천 위치를 '대지 중앙에 같은 기종·지브로 놓은 무대책 안'과 비교.
+
+    반환: dict {"baseline_f1", "rec_f1", "reduction_pct", "sentence"} or None.
+    의미: 아무 검토 없이 대지 한가운데 세웠을 때 대비, 최적화 추천이
+    제3자 위험(F1)을 몇 % 낮추는지 — 시스템의 '가치'를 한 문장으로 증명.
+    """
+    try:
+        import numpy as _np
+        import objectives as _O
+        from shapely.geometry import Polygon as _Poly
+
+        model = MODEL_LIST[int(_np.clip(x[2], 0, 2))]
+        jib = float(x[3])
+        cx, cy = float(x[0]), float(x[1])
+
+        # 대지 중앙 좌표 — objectives.SITE 는 대지 shapely Polygon
+        from shapely.geometry import Polygon as _Poly2
+        _site_poly = getattr(_O, "SITE", None)
+        if _site_poly is not None and hasattr(_site_poly, "centroid"):
+            c = _site_poly.centroid
+        else:
+            lot = getattr(_O, "LOT_VERTICES", None)
+            if lot is None or len(lot) < 3:
+                return None
+            c = _Poly2(lot).centroid
+        bx, by = float(c.x), float(c.y)
+
+        base_f1 = _O.compute_F1((bx, by), model, jib)["F1"]
+        rec_f1 = _O.compute_F1((cx, cy), model, jib)["F1"]
+        if base_f1 <= 1e-9:
+            return None
+        reduction = (base_f1 - rec_f1) / base_f1 * 100.0
+
+        if reduction >= 1.0:
+            sent = (f"아무 검토 없이 대지 중앙에 세우는 경우(F1 {base_f1:.0f})보다 "
+                    f"제3자 안전위험을 **약 {reduction:.0f}% 낮춘** 위치입니다.")
+        elif reduction <= -1.0:
+            sent = (f"대지 중앙 설치(F1 {base_f1:.0f})와 비교하면 이 위치의 F1이 "
+                    f"다소 높으나, 양중 효율(F2)과의 균형을 고려한 절충해입니다.")
+        else:
+            sent = (f"대지 중앙 설치와 위험 수준이 비슷하나, 양중 효율을 함께 "
+                    f"고려해 균형을 맞춘 위치입니다.")
+        return {"baseline_f1": base_f1, "rec_f1": rec_f1,
+                "reduction_pct": reduction, "sentence": sent}
+    except Exception:
+        return None
