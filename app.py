@@ -278,31 +278,34 @@ with tab2:
 
     spec_df = []
     for mid, spec in CRANES.items():
+        if not spec.get("narrow_site_suitable", False):
+            continue   # 협소대지 부적합 기종 제외
         spec_df.append({
             "모델": spec["name"],
-            "종류": spec["type"],
+            "종류": "러핑(luffing)",
             "최대 능력(t)": spec["max_load_kgf"]/1000,
             "최대 반경(m)": spec["max_radius_m"],
             "끝단 능력(t)": spec["load_at_max_radius_kgf"]/1000,
             "카운터지브(m)": spec["counter_jib_length_m"],
             "자립 한계(m)": spec["free_standing_height_m"],
-            "협소대지 적합": "✅" if spec["narrow_site_suitable"] else "❌",
             "출처": spec["source"][:40] + "...",
         })
+    st.caption("협소대지에 적합한 러핑(luffing) 크레인 2종을 후보로 설정했습니다. "
+               "최적화 탭에서 현장에 더 맞는 기종을 자동으로 선택합니다.")
     st.dataframe(pd.DataFrame(spec_df), hide_index=True, width="stretch")
 
     st.subheader("Load Chart 비교")
 
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
-    colors = {"Potain_MDT_178": "#D32F2F",
-              "Potain_MR_160C": "#1976D2",
+    colors = {"Potain_MR_160C": "#1976D2",
               "Liebherr_280_HC_L": "#388E3C"}
-    labels = {"Potain_MDT_178": "Potain MDT 178 (T)",
-              "Potain_MR_160C": "Potain MR 160C (Lf)",
+    labels = {"Potain_MR_160C": "Potain MR 160C (Lf)",
               "Liebherr_280_HC_L": "Liebherr 280 HC-L (Lf)"}
 
     for ax, scale in zip(axes, ["linear", "log"]):
         for mid, spec in CRANES.items():
+            if not spec.get("narrow_site_suitable", False):
+                continue
             rs = [pt[0] for pt in spec["load_chart"]]
             ws = [pt[1]/1000 for pt in spec["load_chart"]]
             ax.plot(rs, ws, "o-", color=colors[mid], label=labels[mid],
@@ -321,8 +324,8 @@ with tab2:
 
     st.info(
         "**핵심**: 우리 케이스 요구 양중 3.0t + 후크블록·리깅 = **3.4t**. "
-        "세 모델 모두 약 30~50m 반경 내에서 충족하지만, "
-        "T형은 카운터지브 17m 자유회전으로 협소대지 부적합."
+        "두 러핑 모델 모두 약 30~50m 반경 내에서 충족합니다. "
+        "최적화 탭에서 현장 조건에 더 적합한 기종을 자동으로 추천합니다."
     )
 
 
