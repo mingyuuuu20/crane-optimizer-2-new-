@@ -19,6 +19,9 @@ button { padding: 5px 13px; border: none; border-radius: 6px; cursor: pointer; f
 #btn-poly { background: #f2b705; color: #1b2a4a; }
 #btn-rect { background: #27497e; color: #fff; }
 #btn-undo { background: #555; color: #fff; }
+#btn-measure { background: #e67e22; color: #fff; }
+#btn-measure.active { background: #d35400; border: 2px solid #f2b705; }
+.measure-tooltip { background: #1b2a4a; color: #f2b705; border: 1px solid #f2b705; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 #btn-done { background: #2e8b57; color: #fff; padding: 6px 16px; font-size: 13px; margin-left: auto; }
 #btn-done:disabled { background: #444; cursor: not-allowed; color: #888; }
 #status { background: #162d52; color: #f2b705; font-size: 11px; padding: 4px 12px; min-height: 22px; }
@@ -42,6 +45,7 @@ button { padding: 5px 13px; border: none; border-radius: 6px; cursor: pointer; f
   <span>도구:</span>
   <button id="btn-poly">⬠ 다각형</button>
   <button id="btn-rect">▭ 사각형</button>
+  <button id="btn-measure">📏 거리재기</button>
   <button id="btn-undo">↩ 마지막 삭제</button>
   <button id="btn-done" disabled>✅ 완료 — 좌표 생성</button>
 </div>
@@ -175,6 +179,59 @@ document.getElementById('btn-undo').onclick = function() {
   updateCount();
   document.getElementById('status').textContent = '마지막 도형 삭제됨.';
 };
+
+// 거리재기 기능
+var measureActive = false;
+var measurePoints = [];
+var measureLayer = null;
+var measureMarkers = [];
+
+document.getElementById('btn-measure').onclick = function() {
+  measureActive = !measureActive;
+  var btn = document.getElementById('btn-measure');
+  if (measureActive) {
+    btn.classList.add('active');
+    btn.textContent = '📏 거리재기 중단';
+    if (drawHandler) { drawHandler.disable(); drawHandler = null; }
+    document.getElementById('status').textContent = '📏 도로 한쪽을 클릭하세요. (두 점 클릭 → 거리 표시)';
+    measurePoints = [];
+    map.getContainer().style.cursor = 'crosshair';
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '📏 거리재기';
+    measurePoints = [];
+    if (measureLayer) { map.removeLayer(measureLayer); measureLayer = null; }
+    measureMarkers.forEach(function(m){ map.removeLayer(m); });
+    measureMarkers = [];
+    map.getContainer().style.cursor = '';
+    document.getElementById('status').textContent = '도구를 선택해 그리세요.';
+  }
+};
+
+map.on('click', function(e) {
+  if (!measureActive) return;
+  measurePoints.push(e.latlng);
+  // 클릭 마커
+  var m = L.circleMarker(e.latlng, {radius:5, color:'#f2b705', fillColor:'#f2b705', fillOpacity:1}).addTo(map);
+  measureMarkers.push(m);
+
+  if (measurePoints.length === 2) {
+    var p1 = measurePoints[0], p2 = measurePoints[1];
+    var dist = p1.distanceTo(p2);
+    var mid = L.latLng((p1.lat+p2.lat)/2, (p1.lng+p2.lng)/2);
+    if (measureLayer) map.removeLayer(measureLayer);
+    measureLayer = L.polyline([p1, p2], {color:'#f2b705', weight:2, dashArray:'5,5'}).addTo(map);
+    var distStr = dist >= 1000 ? (dist/1000).toFixed(2)+'km' : dist.toFixed(1)+'m';
+    measureLayer.bindTooltip('<b>'+distStr+'</b>', {permanent:true, className:'measure-tooltip', direction:'center'}).openTooltip();
+    document.getElementById('status').textContent = '📏 거리: '+distStr+' | 다시 재려면 버튼 클릭';
+    // 초기화해서 다시 잴 수 있게
+    measurePoints = [];
+    measureMarkers.forEach(function(mk){ map.removeLayer(mk); });
+    measureMarkers = [];
+  } else {
+    document.getElementById('status').textContent = '📏 반대편을 클릭하세요.';
+  }
+});
 
 document.getElementById('btn-done').onclick = function() {
   var center = map.getCenter();
