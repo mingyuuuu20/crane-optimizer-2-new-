@@ -213,83 +213,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
 # ① 부지·환경 탭
 # =============================================================================
 with tab1:
-    # ── 임시 API 테스트 (확인 후 삭제) ──
-    with st.expander("🔧 [임시] 카카오+건축물대장 테스트", expanded=False):
-        if st.button("API 테스트 실행", key="api_test"):
-            import urllib.request as _ur, json as _jj
-            _lat, _lng = 35.1800, 128.1076
 
-            # 카카오 역지오코딩
-            _KAKAO = "c21676d31779f142f371f20d2c71e861"
-            _url1 = f"https://dapi.kakao.com/v2/local/geo/coord2address.json?x={_lng}&y={_lat}"
-            try:
-                _req1 = _ur.Request(_url1, headers={'Authorization': f'KakaoAK {_KAKAO}'})
-                _r1 = _ur.urlopen(_req1, timeout=8)
-                _d1 = _jj.loads(_r1.read())
-                _docs = _d1.get("documents", [])
-                if _docs:
-                    _addr = _docs[0].get("address", {})
-                    st.success(f"✅ 카카오 성공! 주소: {_addr.get('address_name')} / 법정동코드: {_addr.get('b_code')}")
-                    st.session_state["_test_bcode"] = _addr.get("b_code", "")
-                    st.session_state["_test_main"] = _addr.get("main_address_no", "")
-                    st.session_state["_test_sub"] = _addr.get("sub_address_no", "0")
-                else:
-                    st.warning(f"카카오 응답 없음: {_d1}")
-            except Exception as _e:
-                st.error(f"❌ 카카오 실패: {_e}")
-
-            # 건축물대장
-            _BLD = "mJiMm5gtdFSd3eIsRECuE%2FIRanwWwbKVW%2BRYGUNZvxscV5wVFhFNH%2FqVVJuxvi2%2F8n%2F9ntZhpxZscf%2Bdv1xfSw%3D%3D"
-            _bcode = st.session_state.get("_test_bcode", "4817010200")
-            _sigungu = _bcode[:5] if _bcode else "48170"
-            _bjdong = _bcode[5:] if _bcode else "10200"
-            _main = st.session_state.get("_test_main", "291")
-            _sub = st.session_state.get("_test_sub", "6")
-            _url2 = (f"https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo?"
-                    f"serviceKey={_BLD}&sigunguCd={_sigungu}&bjdongCd={_bjdong}"
-                    f"&bun={int(_main):04d}&ji={int(_sub) if _sub else 0:04d}"
-                    f"&numOfRows=1&_type=json")
-            try:
-                _req2 = _ur.Request(_url2, headers={'User-Agent': 'Mozilla/5.0'})
-                _r2 = _ur.urlopen(_req2, timeout=10)
-                _d2 = _jj.loads(_r2.read())
-                _items = _d2.get("response", {}).get("body", {}).get("items", {})
-                _item = _items.get("item", []) if _items else []
-                if isinstance(_item, dict): _item = [_item]
-                if _item:
-                    _i = _item[0]
-                    st.success(f"✅ 건축물대장 성공! 층수: {_i.get('grndFlrCnt')}층, 높이: {_i.get('heit')}m, 용도: {_i.get('mainPurpsCdNm')}")
-                else:
-                    st.warning(f"건축물대장 응답: {str(_d2)[:200]}")
-            except Exception as _e:
-                st.error(f"❌ 건축물대장 실패: {_e}")
-    # ── 임시 테스트 끝 ──
-    # ── 임시 WFS 테스트 (확인 후 삭제) ──
-    with st.expander("🔧 [임시] WFS 테스트", expanded=False):
-        if st.button("새 키로 WFS 테스트", key="wfs_test2"):
-            import urllib.request as _ur, json as _jj
-            _KEY = "D82F8BEE-01DB-3486-8C51-433AC82F21C2"
-            _lat, _lng = 35.1800, 128.1076
-            _d = 0.0002
-            _url = (f"https://api.vworld.kr/ned/wfs/getCtnlgsSpcePWFS?"
-                   f"key={_KEY}&typename=dt_d002"
-                   f"&bbox={_lng-_d},{_lat-_d},{_lng+_d},{_lat+_d},EPSG:4326"
-                   f"&maxfeatures=1&outputformat=application/json&srsname=EPSG:4326")
-            try:
-                _req = _ur.Request(_url, headers={
-                    'Referer': 'https://crane-lmg.streamlit.app',
-                    'User-Agent': 'Mozilla/5.0'
-                })
-                _r = _ur.urlopen(_req, timeout=10)
-                _data = _jj.loads(_r.read())
-                st.success(f"✅ 성공! features: {_data.get('totalFeatures', '?')}")
-                if _data.get("features"):
-                    f0 = _data["features"][0]
-                    st.json({"geometry_type": f0["geometry"]["type"],
-                             "props": list(f0.get("properties", {}).keys())[:5]})
-            except Exception as _e:
-                st.error(f"❌ 실패: {_e}")
-    # ── 임시 테스트 끝 ──
 
     col1, col2 = st.columns([1.2, 1])
 
@@ -501,10 +425,71 @@ with tab3:
         f2_norm = (_Ff[:, 1] - _Ff[:, 1].min()) / (_Ff[:, 1].max() - _Ff[:, 1].min() + 1e-9)
         idx_knee = int(_idxmap[int(np.argmin(f1_norm**2 + f2_norm**2))])
 
-        col1, col2 = st.columns([1, 1])
+        # ====================================================================
+        # 추천 요약 (첫인상) — 한 줄 추천 + 핵심 숫자 3개 + 추천 위치 1개
+        # 자세한 분석(Pareto·대표 3해·테이블)은 아래 expander로 접어둠
+        # ====================================================================
+        _xk = X_sorted[idx_knee]
+        _Fk = F_sorted[idx_knee]
+        try:
+            from explain import build_headline
+            _cons0 = st.session_state.get("opt_cons")
+            _hd = build_headline(
+                _xk, _Fk,
+                agreement_m=_cons0.get("agreement_m") if _cons0 else None,
+                n_seeds=len(_cons0.get("seeds", [])) if _cons0 else None,
+            )
+            st.success("#### ✅ 추천 결과\n\n" + _hd["headline"])
+            _mc = st.columns(3)
+            for _c, (_lab, _val, _sub) in zip(_mc, _hd["metrics"]):
+                _c.metric(_lab, _val, help=_sub)
+            if _hd["confidence"]:
+                st.caption("🔁 " + _hd["confidence"])
+        except Exception as _hde:
+            st.caption(f"(요약 생성 생략: {_hde})")
 
-        with col1:
-            st.markdown("### Pareto Front")
+        # 추천 위치 한 장 (knee만 부지 위에 크게)
+        _figk, _axk = plt.subplots(figsize=(8, 5.2))
+        draw_site(_axk)
+        _xx, _yy, _mi, _jb, _ms = _xk
+        _axk.scatter(_xx, _yy, s=420, marker="*", c="#1565C0",
+                     edgecolors="black", linewidths=2, zorder=20)
+        _axk.add_patch(Circle((_xx, _yy), _jb, fill=False, edgecolor="#1565C0",
+                              linewidth=2.2, linestyle="--", alpha=0.7, zorder=15))
+        _axk.annotate("추천 위치", (_xx, _yy), textcoords="offset points",
+                      xytext=(10, 10), fontsize=11, fontweight="bold",
+                      color="#0D2B5B",
+                      bbox=dict(fc="white", ec="none", alpha=0.8, pad=2))
+        _sbk = ACTIVE_SITE.SEARCH_BOUNDS
+        _axk.set_xlim(_sbk["x_range"][0] - 8, _sbk["x_range"][1] + 8)
+        _axk.set_ylim(_sbk["y_range"][0] - 6, _sbk["y_range"][1] + 6)
+        _axk.set_xlabel("X (East, m)"); _axk.set_ylabel("Y (North, m)")
+        st.pyplot(_figk); plt.close(_figk)
+
+        # 추천 근거 자동 설명 (knee 기준) — 요약 바로 아래, 펼침 기본
+        try:
+            from explain import build_explanation
+            _cons = st.session_state.get("opt_cons")
+            _expl = build_explanation(
+                X_sorted[idx_knee], F_sorted[idx_knee], F_sorted,
+                mode=st.session_state.get("opt_mode", "static"),
+                agreement_m=_cons.get("agreement_m") if _cons else None,
+                n_seeds=len(_cons.get("seeds", [])) if _cons else None,
+            )
+            with st.expander("🤖 이 추천이 나온 이유 (자세히)", expanded=False):
+                st.markdown(_expl)
+        except Exception as _ee:
+            st.caption(f"(설명 생성 생략: {_ee})")
+
+        # ====================================================================
+        # 자세한 분석 — 기본 접힘
+        # ====================================================================
+        with st.expander("📊 자세한 분석 보기 (Pareto front · 대표 해 비교)",
+                         expanded=False):
+            col1, col2 = st.columns([1, 1])
+
+            with col1:
+                st.markdown("### Pareto Front")
             fig, ax = plt.subplots(figsize=(8, 6))
             mc = {0: "#D32F2F", 1: "#1976D2", 2: "#388E3C"}
             ml = {0: "MDT 178 (T)", 1: "MR 160C (Lf)", 2: "280 HC-L (Lf)"}
@@ -534,54 +519,45 @@ with tab3:
             st.pyplot(fig)
             plt.close(fig)
 
-        with col2:
-            st.markdown("### 부지 위 대표 위치")
-            fig, ax = plt.subplots(figsize=(8, 6))
-            draw_site(ax)
-            for idx, label, c in reps:
+            with col2:
+                st.markdown("### 부지 위 대표 위치")
+                fig, ax = plt.subplots(figsize=(8, 6))
+                draw_site(ax)
+                for idx, label, c in reps:
+                    x, y, m_idx, jib, mast = X_sorted[idx]
+                    ax.scatter(x, y, s=350, marker="*", c=c,
+                                edgecolors="black", linewidths=2, zorder=20)
+                    circle = Circle((x, y), jib, fill=False,
+                                     edgecolor=c, linewidth=2,
+                                     linestyle="--", alpha=0.6, zorder=15)
+                    ax.add_patch(circle)
+                sb = ACTIVE_SITE.SEARCH_BOUNDS
+                ax.set_xlim(sb["x_range"][0] - 8, sb["x_range"][1] + 8)
+                ax.set_ylim(sb["y_range"][0] - 6, sb["y_range"][1] + 6)
+                ax.set_xlabel("X (East, m)")
+                ax.set_ylabel("Y (North, m)")
+                st.pyplot(fig)
+                plt.close(fig)
+
+            # 대표 3개 카드 — 안전 우선 / 균형 / 효율 우선 비교
+            st.markdown("### 🏆 대표 해 3가지 — 무엇을 우선하느냐에 따라")
+            st.caption("안전(F1)을 가장 낮춘 해, 균형점(추천), 공기(F2)를 가장 "
+                       "줄인 해를 나란히 비교합니다.")
+            rep_cols = st.columns(3)
+            _replabel_ko = {"Min F1 (Safety)": "🛡️ 안전 우선",
+                            "Knee (Balanced)": "⭐ 균형 (추천)",
+                            "Min F2 (Efficiency)": "⚡ 공기 우선"}
+            for col, (idx, label, c) in zip(rep_cols, reps):
                 x, y, m_idx, jib, mast = X_sorted[idx]
-                ax.scatter(x, y, s=350, marker="*", c=c,
-                            edgecolors="black", linewidths=2, zorder=20)
-                circle = Circle((x, y), jib, fill=False,
-                                 edgecolor=c, linewidth=2,
-                                 linestyle="--", alpha=0.6, zorder=15)
-                ax.add_patch(circle)
-            sb = ACTIVE_SITE.SEARCH_BOUNDS
-            ax.set_xlim(sb["x_range"][0] - 8, sb["x_range"][1] + 8)
-            ax.set_ylim(sb["y_range"][0] - 6, sb["y_range"][1] + 6)
-            ax.set_xlabel("X (East, m)")
-            ax.set_ylabel("Y (North, m)")
-            st.pyplot(fig)
-            plt.close(fig)
-
-        # 대표 3개 카드
-        st.markdown("### 🏆 대표 해 3가지")
-        rep_cols = st.columns(3)
-        for col, (idx, label, c) in zip(rep_cols, reps):
-            x, y, m_idx, jib, mast = X_sorted[idx]
-            f1, f2 = F_sorted[idx]
-            model = MODEL_LIST[int(m_idx)].replace("_", " ")
-            with col:
-                st.markdown(f"#### {label}")
-                st.metric("F1 (Risk)", f"{f1:.1f}")
-                st.metric("F2 (시간)", f"{f2:.1f}h ({f2/8:.1f}일)")
-                st.text(f"위치: ({x:.1f}, {y:.1f})")
-                st.text(f"모델: {model}")
-                st.text(f"지브: {jib:.1f}m  마스트: {mast:.1f}m")
-
-        # 추천 근거 자동 설명 (knee 기준)
-        try:
-            from explain import build_explanation
-            _cons = st.session_state.get("opt_cons")
-            _expl = build_explanation(
-                X_sorted[idx_knee], F_sorted[idx_knee], F_sorted,
-                mode=st.session_state.get("opt_mode", "static"),
-                agreement_m=_cons.get("agreement_m") if _cons else None,
-                n_seeds=len(_cons.get("seeds", [])) if _cons else None,
-            )
-            st.markdown(_expl)
-        except Exception as _ee:
-            st.caption(f"(설명 생성 생략: {_ee})")
+                f1, f2 = F_sorted[idx]
+                model = MODEL_LIST[int(m_idx)].replace("_", " ")
+                with col:
+                    st.markdown(f"#### {_replabel_ko.get(label, label)}")
+                    st.metric("안전위험 F1", f"{f1:.1f}")
+                    st.metric("양중기간", f"{f2/8:.1f}일", help=f"{f2:.0f}시간")
+                    st.text(f"위치: ({x:.1f}, {y:.1f})")
+                    st.text(f"모델: {model}")
+                    st.text(f"지브: {jib:.1f}m  마스트: {mast:.1f}m")
 
         # v3: 적재 경로 체류분포 w(θ) 장미도 — 운영가중 노출의 시각적 근거
         if st.session_state.get("opt_mode") == "operational":
