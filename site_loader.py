@@ -148,10 +148,10 @@ class SiteData:
 
         # ---- 2) 신축 건물 ----
         pb = spec["planned_building"]
-        if "footprint_box" in pb:
-            self.PLANNED_BUILDING = box(*pb["footprint_box"])
-        elif "footprint" in pb:
+        if "footprint" in pb:
             self.PLANNED_BUILDING = _parse_footprint(pb["footprint"])
+        elif "footprint_box" in pb:
+            self.PLANNED_BUILDING = box(*pb["footprint_box"])
         else:
             raise ValueError("planned_building 에 footprint_box 또는 footprint 필요")
         self.PLANNED_BUILDING_HEIGHT_M = float(pb.get("height_m", 32.0))
