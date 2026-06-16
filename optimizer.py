@@ -563,6 +563,98 @@ def select_knee(F, X=None):
     return int(idx_map[ki_local])
 
 
+def _nondominated(F):
+    """F (n,2) 최소화 기준 비지배 마스크."""
+    n = len(F)
+    keep = np.ones(n, dtype=bool)
+    for i in range(n):
+        if not keep[i]:
+            continue
+        for j in range(n):
+            if i == j:
+                continue
+            # j가 i를 지배? (둘 다 ≤ 이고 하나는 <)
+            if (F[j, 0] <= F[i, 0] and F[j, 1] <= F[i, 1] and
+                    (F[j, 0] < F[i, 0] or F[j, 1] < F[i, 1])):
+                keep[i] = False
+                break
+    return keep
+
+
+def run_random_search(n_samples=4000, seed=42, verbose=True):
+    """동일 결정변수 공간에서 무작위 샘플링 baseline.
+
+    NSGA-II의 우수성을 정량 비교하기 위한 대조군. 같은 제약·목적함수를
+    사용하되, 진화 없이 순수 무작위로 n_samples개를 뽑아 제약을 만족하는
+    해들의 비지배 front를 구한다.
+
+    반환: dict {F, X, n_feasible, n_samples}
+    """
+    rng = np.random.default_rng(seed)
+    xl = np.array([_SEARCH_X_RANGE[0], _SEARCH_Y_RANGE[0], 0.0,
+                   _JIB_RANGE[0], _MAST_RANGE[0]])
+    xu = np.array([_SEARCH_X_RANGE[1], _SEARCH_Y_RANGE[1],
+                   len(MODEL_LIST) - 1e-3, _JIB_RANGE[1], _MAST_RANGE[1]])
+    samples = xl + rng.random((n_samples, 5)) * (xu - xl)
+
+    feasF, feasX = [], []
+    for i in range(n_samples):
+        x, y, m_idx, jib, mast = samples[i]
+        model = MODEL_LIST[int(np.clip(m_idx, 0, len(MODEL_LIST) - 1))]
+        try:
+            g = continuous_constraints((x, y), model, mast, jib)
+            if np.all(np.asarray(g) <= 0):  # 모든 제약 충족
+                f1 = compute_F1_active((x, y), model, jib)["F1"]
+                f2 = compute_F2((x, y), model)["F2_calendar_hours"]
+                feasF.append([f1, f2])
+                feasX.append([x, y, m_idx, jib, mast])
+        except Exception:
+            continue
+
+    if not feasF:
+        if verbose:
+            print(f"[Random Search] 실행가능해 0개 / {n_samples} 샘플")
+        return {"F": np.empty((0, 2)), "X": np.empty((0, 5)),
+                "n_feasible": 0, "n_samples": n_samples}
+
+    feasF = np.array(feasF); feasX = np.array(feasX)
+    mask = _nondominated(feasF)
+    if verbose:
+        print(f"[Random Search] {n_samples}샘플 중 실행가능 {len(feasF)}개, "
+              f"비지배 {int(mask.sum())}개")
+    return {"F": feasF[mask], "X": feasX[mask],
+            "n_feasible": len(feasF), "n_samples": n_samples}
+
+
+def compare_nsga_vs_random(nsga_F, n_samples=4000, seed=42):
+    """NSGA-II Pareto vs Random Search 정량 비교.
+
+    지표 (명확하고 해석이 분명한 것만):
+    - nsga_best_F1 / random_best_F1: 각 방법이 도달한 '가장 안전한' 해의 F1
+    - nsga_best_F2 / random_best_F2: 각 방법이 도달한 '가장 빠른' 해의 F2
+    - 해 개수, 실행가능 비율
+    반환: dict
+    """
+    rs = run_random_search(n_samples=n_samples, seed=seed, verbose=False)
+    nsga_F = np.asarray(nsga_F)
+    out = {
+        "random": rs,
+        "nsga_best_F1": float(nsga_F[:, 0].min()) if len(nsga_F) else None,
+        "nsga_best_F2": float(nsga_F[:, 1].min()) if len(nsga_F) else None,
+        "random_best_F1": float(rs["F"][:, 0].min()) if rs["n_feasible"] else None,
+        "random_best_F2": float(rs["F"][:, 1].min()) if rs["n_feasible"] else None,
+        "nsga_n": int(len(nsga_F)),
+        "random_n": int(len(rs["F"])),
+        "feasible_rate": rs["n_feasible"] / rs["n_samples"] if rs["n_samples"] else 0,
+    }
+    # F1 개선율 (가장 안전한 해 기준)
+    if out["nsga_best_F1"] is not None and out["random_best_F1"]:
+        out["f1_improvement_pct"] = (
+            (out["random_best_F1"] - out["nsga_best_F1"])
+            / out["random_best_F1"] * 100)
+    return out
+
+
 if __name__ == "__main__":
     result, _ = run_optimization(pop_size=80, n_gen=60, seed=42, per_model=True)
     summarize_pareto_front(result, top_k=15)
