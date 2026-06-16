@@ -8,7 +8,7 @@ app.py — Streamlit 인터랙티브 UI (범용화 v2)
   ① 부지·환경    : 부지 선택 + 데이터 확인
   ② 크레인 모델  : 3개 후보 모델 사양·Load chart 비교
   ③ 최적화       : NSGA-II 실행 + Pareto front
-  ④ 후보 평가    : 사용자 입력 → 12개 제약 자동 검증 + F1·F2 계산
+  ④ 후보 평가    : 사용자 입력 → 9개 제약 자동 검증 + F1·F2 계산
   ⑤ 검증·민감도  : Level 1·3 자동 검증 리포트
 
 NEW (v2): 사이드바에서 부지 선택 가능. 공덕동 또는 합성 부지 (A/B/C) 선택 시
@@ -203,9 +203,9 @@ def draw_site(ax, show_lift_points=True, show_yard=True):
 # =============================================================================
 # 탭 정의
 # =============================================================================
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "① 부지·환경", "② 크레인 모델", "③ 최적화 (NSGA-II)",
-    "④ 후보 평가", "⑤ 검증·민감도", "➕ 내 현장 만들기"
+    "④ 후보 평가", "⑤ 검증·민감도", "⑥ 방법론", "➕ 내 현장 만들기"
 ])
 
 
@@ -487,6 +487,8 @@ with tab3:
             _mc = st.columns(3)
             for _c, (_lab, _val, _sub) in zip(_mc, _hd["metrics"]):
                 _c.metric(_lab, _val, help=_sub)
+            if _hd.get("why_model"):
+                st.caption("🏗️ " + _hd["why_model"])
             if _hd["confidence"]:
                 st.caption("🔁 " + _hd["confidence"])
         except Exception as _hde:
@@ -664,6 +666,45 @@ with tab3:
                 })
             st.dataframe(pd.DataFrame(table), hide_index=True, width="stretch")
 
+        # ---- NSGA-II vs Random Search 비교 (알고리즘 우수성 입증) ----
+        with st.expander("⚖️ 다른 방법과 비교 — NSGA-II vs 무작위 탐색"):
+            st.caption("같은 결정변수 공간·같은 9개 제약·같은 목적함수에서, "
+                       "진화 없는 순수 무작위 탐색(Random Search)과 비교합니다. "
+                       "'최적화가 정말 효과가 있는가'를 정량적으로 보여줍니다.")
+            if st.button("무작위 탐색과 비교 실행", key="cmp_rs"):
+                with st.spinner("무작위 4000개 샘플 평가 중..."):
+                    try:
+                        from optimizer import compare_nsga_vs_random
+                        _cmp = compare_nsga_vs_random(F, n_samples=4000, seed=42)
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            st.markdown("**NSGA-II (제안 방법)**")
+                            st.metric("찾은 해 개수", f"{_cmp['nsga_n']}개")
+                            st.metric("가장 안전한 배치 F1",
+                                      f"{_cmp['nsga_best_F1']:.0f}")
+                            st.metric("가장 빠른 배치 F2",
+                                      f"{_cmp['nsga_best_F2']/8:.1f}일")
+                        with c2:
+                            st.markdown("**무작위 탐색 (대조군)**")
+                            st.metric("찾은 해 개수", f"{_cmp['random_n']}개")
+                            st.metric("가장 안전한 배치 F1",
+                                      f"{_cmp['random_best_F1']:.0f}"
+                                      if _cmp['random_best_F1'] else "—")
+                            st.metric("실행가능 비율",
+                                      f"{_cmp['feasible_rate']*100:.1f}%",
+                                      help="4000개 무작위 배치 중 9개 제약을 "
+                                           "모두 만족한 비율")
+                        if _cmp.get("f1_improvement_pct"):
+                            st.success(
+                                f"✅ NSGA-II는 무작위 탐색보다 **가장 안전한 배치의 "
+                                f"위험(F1)을 약 {_cmp['f1_improvement_pct']:.0f}% 낮췄고**, "
+                                f"훨씬 다양한 선택지({_cmp['nsga_n']}개 vs "
+                                f"{_cmp['random_n']}개)를 제공합니다.")
+                        st.caption("협소대지에서는 무작위 배치 대부분이 제약을 "
+                                   "위반하므로, 체계적 최적화의 효과가 특히 큽니다.")
+                    except Exception as _ce:
+                        st.error(f"비교 실패: {_ce}")
+
         # ---- PDF 검토 보고서 생성 ----
         st.markdown("---")
         st.markdown("#### 📄 검토 보고서 (PDF)")
@@ -695,7 +736,7 @@ with tab3:
 # =============================================================================
 with tab4:
     st.subheader("크레인 배치 후보 수동 평가")
-    st.markdown("위치·모델·지브·마스트를 입력하면 12개 제약 검증 + F1·F2 자동 계산")
+    st.markdown("위치·모델·지브·마스트를 입력하면 9개 제약 검증 + F1·F2 자동 계산")
 
     col_in, col_vis = st.columns([1, 1.3])
 
@@ -758,10 +799,12 @@ with tab4:
         (x_input, y_input), model_input, mast_input, jib_input
     )
 
+    _c2g = {"C1":"G1","C2-1":"G2","C2-3":"G3·G9","C3-1":"G4","C4-1":"G4",
+            "C5":"G5","C6":"G6","C7":"G7","C8":"G8"}
     if all_pass:
-        st.success("✅ 모든 12개 제약 통과")
+        st.success("✅ 모든 9개 제약 통과")
     else:
-        failed = [k for k, v in results.items() if not v[0]]
+        failed = [_c2g.get(k, k) for k, v in results.items() if not v[0]]
         st.error(f"❌ {len(failed)}개 제약 위반: {', '.join(failed)}")
 
     col_c1, col_c2 = st.columns(2)
@@ -769,7 +812,10 @@ with tab4:
         st.markdown("**제약조건 검사**")
         for cid, (passed, msg) in results.items():
             mark = "✅" if passed else "❌"
-            st.text(f"{mark} {cid}: {msg}")
+            _g = _c2g.get(cid, cid)
+            # 메시지 앞머리의 C표기도 G로 치환
+            _msg2 = msg.replace(cid, _g, 1) if msg.startswith(cid) else msg
+            st.text(f"{mark} {_g}: {_msg2}")
 
     with col_c2:
         st.markdown("**목적함수**")
@@ -803,7 +849,7 @@ with tab4:
 with tab5:
     st.subheader("검증 및 민감도 분석")
     st.markdown("""
-    - **Level 1**: 코드 적합성 — 12개 제약 자동 검증
+    - **Level 1**: 코드 적합성 — 9개 제약 자동 검증
     - **Level 3-A**: F1 가중치 ±50% 민감도
     - **Level 3-B**: 사고확률 변동 (1e-5 ~ 1e-3)
     - **Level 3-C**: 가동률 변동 (0.4 ~ 0.85)
@@ -849,21 +895,40 @@ with tab5:
 
         # Level 1
         st.markdown("### Level 1: 적합성")
+        # 코드 내부 C표기 → 보고서 G표기 통일
+        _c_to_g = {
+            "C1": "G1", "C2-1": "G2", "C2-3": "G3·G9", "C3-1": "G4",
+            "C4-1": "G4", "C5": "G5", "C6": "G6", "C7": "G7",
+            "C8": "G8",
+        }
         if L1['overall_pass']:
-            st.success(f"✅ 통과: {L1['n_passed']}/{L1['n_passed']+L1['n_failed']}")
+            st.success(f"✅ 통과: {L1['n_passed']}/{L1['n_passed']+L1['n_failed']} "
+                       "제약 모두 충족")
         else:
-            st.error(f"❌ 위반: {L1['n_failed']}개 (실패: {L1['failed_constraints']})")
+            _failed_g = [_c_to_g.get(c, c) for c in L1['failed_constraints']]
+            st.error(f"❌ 위반: {L1['n_failed']}개 (실패: {', '.join(_failed_g)})")
+            st.caption("입력하신 배치가 위 제약을 충족하지 못합니다. "
+                       "위치·지브·마스트를 조정해 보세요.")
 
         # Level 3-A
         st.markdown("### Level 3-A: F1 가중치 민감도 (±50%)")
+        _cat_ko = {
+            "own_site": "자기 부지",
+            "planned_building": "신축 건물",
+            "adjacent_residential": "인접 주거",
+            "road": "도로",
+            "empty": "공지(빈터)",
+        }
         sens_df = pd.DataFrame([
-            {"카테고리": cat,
+            {"구역": _cat_ko.get(cat, cat),
              "+50% F1": f"{p['F1_high']:.1f}",
              "-50% F1": f"{p['F1_low']:.1f}",
              "민감도지수(%)": f"{p['sensitivity_index']:.1f}"}
             for cat, p in sens_w['perturbations'].items()
         ])
         st.dataframe(sens_df, hide_index=True, width="stretch")
+        st.caption("민감도지수가 낮을수록 그 가중치를 다르게 정해도 결과가 "
+                   "안정적입니다. 도로가 가장 민감하지만 20% 미만입니다.")
 
         # Level 3-D Monte Carlo
         st.markdown("### Level 3-D: Monte Carlo 강건성 (n=200)")
@@ -888,6 +953,11 @@ with tab5:
 # ➕ 내 현장 만들기 탭 (폼 입력 + 실시간 미리보기 + JSON 저장)
 # =============================================================================
 with tab6:
+    from methodology import render_methodology
+    render_methodology()
+
+
+with tab7:
     st.subheader("내 현장 만들기")
     st.caption("대지·건물·인접·도로를 입력하면 미리보기가 갱신됩니다. 저장하면 ① 부지 선택 목록에 추가됩니다.")
     import json as _json
