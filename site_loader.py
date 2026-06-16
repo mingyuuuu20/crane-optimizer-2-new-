@@ -215,7 +215,14 @@ class SiteData:
             for i in range(nx):
                 x = bb[0] + (i + 0.5) * (bb[2] - bb[0]) / nx
                 y = bb[1] + (j + 0.5) * (bb[3] - bb[1]) / ny
-                self.BUILDING_GRID_POINTS.append((x, y))
+                # 실제 다각형 안에 있는 점만 포함
+                from shapely.geometry import Point as _Pt
+                if self.PLANNED_BUILDING.contains(_Pt(x, y)):
+                    self.BUILDING_GRID_POINTS.append((x, y))
+        # 격자점이 너무 적으면 중심점이라도 추가
+        if len(self.BUILDING_GRID_POINTS) == 0:
+            c = self.PLANNED_BUILDING.centroid
+            self.BUILDING_GRID_POINTS.append((c.x, c.y))
 
         my = lp.get("material_yard", None)
         if my is None:
