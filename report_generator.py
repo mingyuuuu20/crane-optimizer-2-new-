@@ -34,14 +34,20 @@ def b64(path):
         return "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
 
-def run_report(site_path, pop=100, gen=60, seed=0):
+def run_report(site_path, pop=100, gen=60, seed=0, F_ext=None, X_ext=None):
     s = load_site(site_path); use_site(s)
     name = s.metadata.get("display_name", os.path.basename(site_path))
     loc = s.metadata.get("location", "")
     area = s.SITE.area
 
-    # 최적화
-    r = optimizer.run_dual_branch_optimization(pop_size=pop, n_gen=gen, seed=seed, verbose=False)
+    # 외부에서 F/X가 넘어오면 재사용, 없으면 새로 최적화
+    if F_ext is not None and X_ext is not None and len(F_ext) > 0:
+        import types
+        r = types.SimpleNamespace()
+        r.F = np.asarray(F_ext); r.X = np.asarray(X_ext)
+    else:
+        result, _ = optimizer.run_optimization(pop_size=pop, n_gen=gen, seed=seed, verbose=False)
+        r = result
     feasible = (r.F is not None and len(r.F) > 0)
 
     tmp = tempfile.mkdtemp()
