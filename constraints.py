@@ -194,9 +194,14 @@ def _operational_sector_area(crane_xy, lift_points_arr, jib_length, swept_r,
                                  margin_deg=10):
     """
     러핑 크레인은 sector 내에서만 작동.
-    Sector = 양중점들을 모두 포함하는 최소 각도 + 안전 margin.
+    Sector = 도달 가능한 양중점들을 모두 포함하는 최소 각도 + 안전 margin.
 
-    Returns: Polygon (sector shape), 또는 full circle (T형 또는 도달 불가 시).
+    수정 (v2.6):
+    - 도달 불가 양중점은 C5에서 처리 -> 여기서는 도달 가능한 점만으로 sector 계산
+    - 양중점이 360도 퍼진 경우도 full circle 대신 최소 bounding sector 사용
+      (러핑 크레인은 어떤 위치에서도 full circle 작동 안 함)
+
+    Returns: Polygon (sector shape).
     """
     import math
     from shapely.geometry import Polygon as _P, Point as _Pt
@@ -206,12 +211,28 @@ def _operational_sector_area(crane_xy, lift_points_arr, jib_length, swept_r,
     for p in lift_points_arr:
         d = crane_pt.distance(_Pt(p))
         if d > jib_length + 0.5:
-            return None  # 일부 양중점 도달 불가
+            continue  # 도달 불가 -> C5에서 처리, 여기서는 skip
         ang = math.atan2(p[1] - crane_xy[1], p[0] - crane_xy[0])
         angles.append(ang)
 
+    # 도달 가능한 양중점이 없으면 swept_r 원 (C5가 실패 처리)
+    if len(angles) == 0:
+        return crane_pt.buffer(swept_r)
+
+    # 양중점이 1개면 margin만 붙인 좁은 sector
+    if len(angles) == 1:
+        m = math.radians(margin_deg)
+        start_angle = angles[0] - m
+        end_angle = angles[0] + m
+        n_arc = 24
+        pts = [crane_xy]
+        for i in range(n_arc + 1):
+            t = start_angle + (end_angle - start_angle) * i / n_arc
+            pts.append((crane_xy[0] + swept_r * math.cos(t),
+                        crane_xy[1] + swept_r * math.sin(t)))
+        return _P(pts)
+
     angles_sorted = sorted(angles)
-    # 각 점 사이 gap + 마지막→첫번째 wrap-around gap 중 최대 gap 찾기
     n = len(angles_sorted)
     gaps = []
     for i in range(n):
@@ -220,29 +241,25 @@ def _operational_sector_area(crane_xy, lift_points_arr, jib_length, swept_r,
         gap = a2 - a1 if i < n-1 else (2*math.pi + a2 - a1)
         gaps.append(gap)
     max_gap = max(gaps)
-    if max_gap > math.pi:
-        # 양중점들이 한쪽으로 모여있음 → sector 사용 의미 있음
-        idx = gaps.index(max_gap)
-        # sector 는 max_gap의 complement
-        start_angle = angles_sorted[(idx+1) % n]
-        end_angle = angles_sorted[idx]
-        # margin 추가
-        m = math.radians(margin_deg)
-        start_angle -= m
-        end_angle += m
-        # sector polygon 생성
-        n_arc = 24
-        if end_angle < start_angle:
-            end_angle += 2*math.pi
-        pts = [crane_xy]
-        for i in range(n_arc + 1):
-            t = start_angle + (end_angle - start_angle) * i / n_arc
-            pts.append((crane_xy[0] + swept_r * math.cos(t),
-                        crane_xy[1] + swept_r * math.sin(t)))
-        return _P(pts)
-    else:
-        # 양중점이 360° 둘러싸있음 → full circle
-        return crane_pt.buffer(swept_r)
+    idx = gaps.index(max_gap)
+    # sector = max_gap의 complement (양중점들이 있는 쪽)
+    start_angle = angles_sorted[(idx+1) % n]
+    end_angle = angles_sorted[idx]
+    m = math.radians(margin_deg)
+    start_angle -= m
+    end_angle += m
+    n_arc = 24
+    if end_angle < start_angle:
+        end_angle += 2*math.pi
+    # sector가 360도 이상이면 270도로 제한 (러핑 물리적 한계)
+    if end_angle - start_angle >= 2 * math.pi:
+        end_angle = start_angle + math.radians(270)
+    pts = [crane_xy]
+    for i in range(n_arc + 1):
+        t = start_angle + (end_angle - start_angle) * i / n_arc
+        pts.append((crane_xy[0] + swept_r * math.cos(t),
+                    crane_xy[1] + swept_r * math.sin(t)))
+    return _P(pts)
 
 
 def check_C2_1_building_clearance(crane_xy, model, jib_length):
