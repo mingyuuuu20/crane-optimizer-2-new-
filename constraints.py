@@ -285,9 +285,6 @@ def check_C2_1_building_clearance(crane_xy, model, jib_length):
         operating_area = _operational_sector_area(
             crane_xy, LIFT_POINTS, jib_length, swept_r
         )
-        if operating_area is None:
-            # 도달 불가 양중점 있음 → C5에서 처리되므로 여기는 full circle fallback
-            operating_area = crane_pt.buffer(swept_r)
 
     for direction, bldg in ADJACENT_BUILDINGS.items():
         dist = operating_area.distance(bldg["footprint"])
@@ -325,9 +322,6 @@ def check_C2_3_no_lot_intrusion(crane_xy, model, jib_length):
         operating_area = _operational_sector_area(
             crane_xy, LIFT_POINTS, jib_length, swept_r
         )
-        if operating_area is None:
-            # 도달 불가 양중점 있음 → C5에서 처리되므로 여기는 full circle fallback
-            operating_area = crane_pt.buffer(swept_r)
 
     if not ALLOWED_AREA.contains(operating_area):
         intrusion = operating_area.difference(ALLOWED_AREA).area
@@ -558,9 +552,6 @@ def continuous_constraints(crane_xy, model, mast_height_m, jib_length_m):
         operating_area = _operational_sector_area(
             crane_xy, LIFT_POINTS, jib_length_m, swept_r
         )
-        if operating_area is None:
-            # 도달 불가 → 큰 위반 + G5에서도 처리
-            operating_area = crane_pt.buffer(swept_r)
 
     g2_worst = -1e6
     for direction, bldg in ADJACENT_BUILDINGS.items():
