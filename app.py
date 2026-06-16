@@ -710,11 +710,16 @@ with tab3:
         st.markdown("#### 📄 검토 보고서 (PDF)")
         st.caption("현재 부지·최적화 설정으로 전문 검토 보고서(PDF)를 생성합니다.")
         if st.button("📄 PDF 보고서 생성", type="primary", width="stretch"):
-            with st.spinner("보고서 생성 중... (최적화 + 그림 + PDF, 약 1분)"):
+            with st.spinner("보고서 생성 중... (그림 + PDF, 약 30초)"):
                 try:
                     import report_generator as RG
-                    out_pdf, rctx = RG.run_report(sel_site_path,
-                                                   pop=pop_size, gen=n_gen, seed=42)
+                    _F_now = st.session_state.get("opt_F")
+                    _X_now = st.session_state.get("opt_X")
+                    out_pdf, rctx = RG.run_report(
+                        sel_site_path,
+                        pop=pop_size, gen=n_gen, seed=42,
+                        F_ext=_F_now, X_ext=_X_now
+                    )
                     with open(out_pdf, "rb") as f:
                         st.session_state["report_pdf"] = f.read()
                     st.session_state["report_name"] = out_pdf.split("/")[-1]
