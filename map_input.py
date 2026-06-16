@@ -155,14 +155,14 @@ def build_site_obj_from_wizard(s: dict) -> dict:
     for i, a in enumerate(s.get("adj", [])):
         pl = _to_local_list(a["pts"], lat0, lng0)
         xs = [p[0] for p in pl]; ys = [p[1] for p in pl]
-        cx = (min(xs) + max(xs)) / 2; cy = (min(ys) + max(ys)) / 2
         w = max(xs) - min(xs); h = max(ys) - min(ys)
         if w < 0.5 or h < 0.5:
             continue
+        # 실제 다각형 그대로 저장 (bounding box 대신)
         adj_list.append({
             "key": f"adj_{i}", "name": str(a.get("name", f"인접{i+1}")),
-            "footprint": {"type": "rect", "cx": round(cx, 2), "cy": round(cy, 2),
-                          "w": round(w, 2), "h": round(h, 2)},
+            "footprint": {"type": "polygon",
+                          "vertices": [[round(p[0],2), round(p[1],2)] for p in pl]},
             "height_m": float(a.get("height_m", 15.0)),
             "floors": int(a.get("floors", 5)),
         })
@@ -652,10 +652,18 @@ def _preview_local(obj):
                              lw=0.8, zorder=1))
     for a in obj["adjacent_buildings"]:
         f = a["footprint"]
-        ax.add_patch(Rect((f["cx"] - f["w"] / 2, f["cy"] - f["h"] / 2),
-                          f["w"], f["h"], fc="#E8B4B4", ec="k", lw=1,
-                          alpha=0.55, zorder=2))
-        ax.text(f["cx"], f["cy"], a["name"][:8], ha="center", va="center",
+        if f.get("type") == "polygon" and f.get("vertices"):
+            verts = f["vertices"]
+            cx = sum(p[0] for p in verts) / len(verts)
+            cy = sum(p[1] for p in verts) / len(verts)
+            ax.add_patch(MplPoly(verts, fc="#E8B4B4", ec="k", lw=1,
+                                 alpha=0.55, zorder=2))
+        else:
+            cx, cy = f.get("cx", 0), f.get("cy", 0)
+            ax.add_patch(Rect((cx - f["w"]/2, cy - f["h"]/2),
+                              f["w"], f["h"], fc="#E8B4B4", ec="k", lw=1,
+                              alpha=0.55, zorder=2))
+        ax.text(cx, cy, a["name"][:8], ha="center", va="center",
                 fontsize=7, fontweight="bold")
     ax.add_patch(MplPoly(obj["lot_vertices"], fc="#FFF3CD", ec="k",
                          lw=2.2, zorder=3))
