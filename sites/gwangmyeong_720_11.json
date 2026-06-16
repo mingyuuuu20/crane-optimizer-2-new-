@@ -1,0 +1,112 @@
+{
+  "metadata": {
+    "display_name": "광명동 720-11 근린생활시설",
+    "address": "경기도 광명시 광명동 720-11번지 외 1필지",
+    "location": "경기도 광명시 광명동",
+    "source": "광명시 건축물대장 + 카카오맵 위성사진",
+    "created": "2026-06-16",
+    "floors_above": 5,
+    "floors_below": 2,
+    "total_floor_area_m2": 5362.0,
+    "site_area_m2": 1298.1,
+    "building_area_m2": 767.96,
+    "actual_crane_xy": [5, 4],
+    "actual_crane_note": "카카오맵 위성사진 57번지 마커 위치에서 판독"
+  },
+  "lot_vertices": [
+    [-25, -13],
+    [ 25, -13],
+    [ 25,  13],
+    [-25,  13]
+  ],
+  "planned_building": {
+    "footprint": [
+      [-19, -9],
+      [ 21, -9],
+      [ 21, 10],
+      [-19, 10]
+    ],
+    "footprint_box": [-19, -9, 21, 10],
+    "floors": 5,
+    "height_m": 22.78,
+    "structure": "RC",
+    "use": "근린생활시설",
+    "method": "갱폼 + 시스템동바리"
+  },
+  "adjacent_buildings": [
+    {
+      "name": "신한빌라 (720-3)",
+      "footprint": [
+        [-8, 14],
+        [ 8, 14],
+        [ 8, 25],
+        [-8, 25]
+      ],
+      "floors": 4,
+      "height_m": 12.0,
+      "structure": "RC",
+      "use": "다세대주택",
+      "airspace_easement": false
+    },
+    {
+      "name": "720-10 창고",
+      "footprint": [
+        [26, -8],
+        [40, -8],
+        [40,  6],
+        [26,  6]
+      ],
+      "floors": 1,
+      "height_m": 4.0,
+      "structure": "조적",
+      "use": "창고시설",
+      "airspace_easement": false
+    },
+    {
+      "name": "중앙빌라 (720-1, 720-2)",
+      "footprint": [
+        [-40, -5],
+        [-26, -5],
+        [-26,  8],
+        [-40,  8]
+      ],
+      "floors": 4,
+      "height_m": 12.0,
+      "structure": "RC",
+      "use": "다세대주택",
+      "airspace_easement": false
+    }
+  ],
+  "roads": {
+    "road_west": {
+      "name": "서측 20m 도로",
+      "polygon": [
+        [-45, -13],
+        [-25, -13],
+        [-25,  13],
+        [-45,  13]
+      ],
+      "width_m": 20.0
+    },
+    "road_south": {
+      "name": "남측 20m 도로",
+      "polygon": [
+        [-25, -33],
+        [ 25, -33],
+        [ 25, -13],
+        [-25, -13]
+      ],
+      "width_m": 20.0
+    }
+  },
+  "material_yard": {
+    "x": -20,
+    "y": -10
+  },
+  "lift_points": {
+    "building_grid": {
+      "nx": 5,
+      "ny": 4
+    }
+  }
+}
