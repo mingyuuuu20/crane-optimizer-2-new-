@@ -132,6 +132,25 @@ def build_headline(x, F_row, agreement_m=None, n_seeds=None):
         f"설치하는 안을 추천합니다. 지브 길이는 **{jib:.0f} m**가 적절합니다."
     )
 
+    # 기종 선택 이유 한 줄 (러핑 적합성 + 능력 여유)
+    why_model = None
+    try:
+        import constraints as _C
+        import objectives as _O
+        from shapely.geometry import Point as _Pt
+        r_far = max(_Pt((cx, cy)).distance(_Pt(p)) for p in _O.LIFT_POINTS)
+        cap_far = _C.lookup_load_capacity(model, r_far)   # kgf
+        max_mat = max(_O.MATERIAL_WEIGHTS.values())        # kgf
+        ratio = cap_far / max_mat if max_mat > 0 else 0
+        why_model = (
+            f"러핑(luffing) 방식이라 지브를 세워 선회반경을 줄일 수 있어 "
+            f"협소대지에 적합하며, 가장 먼 양중점(반경 {r_far:.0f} m)에서도 "
+            f"최대 자재 하중의 약 {ratio:.1f}배까지 인양할 수 있어 능력 여유가 "
+            f"충분합니다."
+        )
+    except Exception:
+        why_model = None
+
     metrics = [
         ("추천 기종", spec_name.split(" (")[0],
          spec_name.split("(")[1].rstrip(")") if "(" in spec_name else ""),
@@ -154,7 +173,8 @@ def build_headline(x, F_row, agreement_m=None, n_seeds=None):
                 f"있었으나, 합의 과정에서 열등한 결과는 자동 제거되었습니다."
             )
 
-    return {"headline": headline, "metrics": metrics, "confidence": confidence}
+    return {"headline": headline, "metrics": metrics,
+            "confidence": confidence, "why_model": why_model}
 
 
 def compute_baseline_improvement(x):
